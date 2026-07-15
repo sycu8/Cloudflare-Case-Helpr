@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
 
 // @ts-expect-error Browser utility is intentionally shipped as plain JavaScript.
-import { parseHumanUtc } from "../public/chat-utils.js";
+import {
+  isDuplicateComposerSubmission,
+  parseHumanUtc,
+} from "../public/chat-utils.js";
 
 const referenceDate = new Date("2026-07-15T06:45:00Z");
 
@@ -19,5 +22,22 @@ describe("human UTC date parsing", () => {
 
   it("rejects text without a recognizable date", () => {
     expect(parseHumanUtc("sometime before lunch", referenceDate)).toBe("");
+  });
+});
+
+describe("composer duplicate protection", () => {
+  it("suppresses an immediate suffix left by text composition", () => {
+    expect(
+      isDuplicateComposerSubmission("today at 3pm", "pm", 120),
+    ).toBe(true);
+  });
+
+  it("allows unrelated answers and delayed text", () => {
+    expect(
+      isDuplicateComposerSubmission("today at 3pm", "Every request", 120),
+    ).toBe(false);
+    expect(
+      isDuplicateComposerSubmission("today at 3pm", "pm", 2_000),
+    ).toBe(false);
   });
 });

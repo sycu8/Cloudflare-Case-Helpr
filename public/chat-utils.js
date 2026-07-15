@@ -49,6 +49,23 @@ export function parseHumanUtc(input, referenceDate = new Date()) {
   return new Date(timestamp).toISOString();
 }
 
+export function isDuplicateComposerSubmission(
+  previousValue,
+  currentValue,
+  elapsedMilliseconds,
+) {
+  if (elapsedMilliseconds < 0 || elapsedMilliseconds > 1_500) return false;
+  const previous = previousValue.trim().toLowerCase();
+  const current = currentValue.trim().toLowerCase();
+  if (!previous || !current) return false;
+  return (
+    previous === current ||
+    (current.length >= 2 &&
+      previous.length > current.length &&
+      previous.endsWith(current))
+  );
+}
+
 function parseRelativeDate(value, referenceDate) {
   const match = value.match(
     /\b(today|yesterday|tomorrow|now)\b(?:\s+at)?(?:\s+(\d{1,2})(?::(\d{2}))?\s*(am|pm)?)?(?:\s*(?:UTC|GMT)\s*([+-]\s*\d{1,2}(?::?\d{2})?)?)?/i,

@@ -1,4 +1,7 @@
-import { parseHumanUtc } from "./chat-utils.js";
+import {
+  isDuplicateComposerSubmission,
+  parseHumanUtc,
+} from "./chat-utils.js";
 
 const STORAGE_KEY = "cf-support-chat-v2";
 const UI_LANGUAGE_KEY = "cf-support-ui-language";
@@ -200,25 +203,53 @@ let screenshotDataUrl;
 let state = loadState() ?? createInitialState();
 let sourceDraft = state.draft || "";
 let saveTimer;
+let isSubmitting = false;
+let lastSubmittedText = "";
+let lastSubmittedAt = 0;
 
 initializeConversation();
 
 elements.composer.addEventListener("submit", async (event) => {
   event.preventDefault();
+  if (isSubmitting) return;
   const text = elements.input.value.trim();
   if (!text && !screenshotDataUrl) return;
-  elements.input.value = "";
-  resizeComposer();
-  if (state.phase === "initial") {
-    await handleInitialIssue(text);
-  } else if (state.currentQuestion) {
-    handleQuestionAnswer(text, text);
+  const submittedAt = Date.now();
+  if (
+    isDuplicateComposerSubmission(
+      lastSubmittedText,
+      text,
+      submittedAt - lastSubmittedAt,
+    )
+  ) {
+    clearComposerInput();
+    return;
+  }
+  lastSubmittedText = text;
+  lastSubmittedAt = submittedAt;
+  isSubmitting = true;
+  clearComposerInput();
+  try {
+    if (state.phase === "initial") {
+      await handleInitialIssue(text);
+    } else if (state.currentQuestion) {
+      handleQuestionAnswer(text, text);
+    }
+  } finally {
+    isSubmitting = false;
+    requestAnimationFrame(clearComposerInput);
   }
 });
 
 elements.input.addEventListener("input", resizeComposer);
 elements.input.addEventListener("keydown", (event) => {
-  if (event.key === "Enter" && !event.shiftKey) {
+  if (
+    event.key === "Enter" &&
+    !event.shiftKey &&
+    !event.repeat &&
+    !event.isComposing &&
+    event.keyCode !== 229
+  ) {
     event.preventDefault();
     elements.composer.requestSubmit();
   }
@@ -930,6 +961,11 @@ function setStatus(message, error = false) {
 function resizeComposer() {
   elements.input.style.height = "auto";
   elements.input.style.height = `${Math.min(elements.input.scrollHeight, 140)}px`;
+}
+
+function clearComposerInput() {
+  elements.input.value = "";
+  resizeComposer();
 }
 
 function removeScreenshot() {
