@@ -398,6 +398,19 @@ export function validateSupportCase(data: SupportCase): {
   if (!data.exactErrors && !data.rayIds && !data.attachments) {
     missing.push("At least one error, Ray ID, or evidence attachment");
   }
+  if (data.priority === "P1") {
+    if (!data.service) missing.push("Affected Cloudflare service (required for P1)");
+    if (!data.hostnames) missing.push("Affected hostname (required for P1)");
+    if (!data.affectedUsers) {
+      missing.push("Affected users or regions (required for P1)");
+    }
+    if (!data.exactErrors && !data.rayIds) {
+      missing.push("Exact error or Ray ID (required for P1)");
+    }
+    if (!data.originFindings) {
+      missing.push("Origin investigation status (required for P1)");
+    }
+  }
 
   const warnings: string[] = [];
   const combined = Object.values(data).filter(Boolean).join("\n");

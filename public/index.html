@@ -176,6 +176,11 @@
               <a href="https://www.cloudflarestatus.com/" target="_blank" rel="noreferrer">Cloudflare Status page</a>
               first. For an active outage or attack, use the Emergency hotline tile
               in your Cloudflare Dashboard. This helper does not escalate emergencies.
+              <span class="critical-mandatory">
+                P1 mandatory fields are marked below. Include the affected service
+                and users, UTC start time, impact, frequency, reproduction, an exact
+                error or Ray ID, and the origin investigation status.
+              </span>
             </div>
 
             <form id="case-form">
@@ -207,10 +212,12 @@
                   </label>
                   <label>
                     Cloudflare service
+                    <span class="critical-note">Required for P1</span>
                     <input name="service" placeholder="CDN, DNS, WAF, Workers…" />
                   </label>
                   <label>
                     Started in UTC
+                    <span class="critical-note">Required for P1</span>
                     <input name="startedUtc" type="datetime-local" />
                   </label>
                   <label>
@@ -223,18 +230,22 @@
                   </label>
                   <label class="span-2">
                     Affected hostname(s)
+                    <span class="critical-note">Required for P1</span>
                     <input name="hostnames" placeholder="api.example.com" />
                   </label>
                   <label>
                     Frequency
+                    <span class="critical-note">Required for P1</span>
                     <input name="frequency" placeholder="Every request, intermittent, once…" />
                   </label>
                   <label>
                     Affected users or regions
+                    <span class="critical-note">Required for P1</span>
                     <input name="affectedUsers" placeholder="All users, APAC only, one ISP…" />
                   </label>
                   <label class="span-2">
                     Production and business impact
+                    <span class="critical-note">Required for P1</span>
                     <textarea name="impact" rows="3" placeholder="What cannot users or the business do?"></textarea>
                   </label>
                 </div>
@@ -245,14 +256,17 @@
                 <div class="field-grid">
                   <label class="span-2">
                     Expected behavior
+                    <span class="critical-note">Required for P1</span>
                     <textarea name="expected" rows="3"></textarea>
                   </label>
                   <label class="span-2">
                     Actual behavior
+                    <span class="critical-note">Required for P1</span>
                     <textarea name="actual" rows="3"></textarea>
                   </label>
                   <label class="span-2">
                     Steps to reproduce
+                    <span class="critical-note">Required for P1</span>
                     <textarea name="reproduction" rows="4" placeholder="1. Open…&#10;2. Submit…&#10;3. Observe…"></textarea>
                   </label>
                   <label class="span-2">
@@ -261,10 +275,12 @@
                   </label>
                   <label class="span-2">
                     Exact error message(s)
+                    <span class="critical-note">Exact error or Ray ID required for P1</span>
                     <textarea name="exactErrors" rows="3"></textarea>
                   </label>
                   <label class="span-2">
                     Ray ID(s)
+                    <span class="critical-note">Exact error or Ray ID required for P1</span>
                     <input name="rayIds" placeholder="One or more Ray IDs from failed requests" />
                   </label>
                 </div>
@@ -279,6 +295,7 @@
                   </label>
                   <label class="span-2">
                     Origin and log findings
+                    <span class="critical-note">Investigation status required for P1</span>
                     <textarea name="originFindings" rows="4" placeholder="Include matching UTC timestamps, not secrets."></textarea>
                   </label>
                   <label class="span-2">

@@ -482,6 +482,27 @@ textarea:focus {
   border: 1px solid #f2c4bf;
 }
 
+.critical-mandatory {
+  display: block;
+  margin-top: 8px;
+  font-weight: 650;
+}
+
+.critical-note {
+  display: none;
+  width: fit-content;
+  padding: 2px 7px;
+  color: var(--red);
+  background: #fff0ee;
+  border-radius: 999px;
+  font-size: 0.68rem;
+  font-weight: 750;
+}
+
+body.is-critical .critical-note {
+  display: inline-block;
+}
+
 fieldset {
   margin: 0;
   padding: 25px 0;

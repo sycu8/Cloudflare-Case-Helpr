@@ -56,6 +56,13 @@ const requiredFields = [
   ["reproduction", "Steps to reproduce"],
   ["evidence", "Error, Ray ID, or attachment"],
 ];
+const criticalRequiredFields = [
+  ["service", "Affected Cloudflare service (P1)"],
+  ["hostname", "Affected hostname (P1)"],
+  ["affectedUsers", "Affected users or regions (P1)"],
+  ["exactOrRay", "Exact error or Ray ID (P1)"],
+  ["originStatus", "Origin investigation status (P1)"],
+];
 
 restoreDraft();
 updateEvidence();
@@ -66,9 +73,7 @@ elements.form.addEventListener("input", () => {
   scheduleSave();
   updateProgress();
 });
-elements.form.elements.priority.addEventListener("change", () => {
-  elements.p1Alert.hidden = elements.form.elements.priority.value !== "P1";
-});
+elements.form.elements.priority.addEventListener("change", updateCriticalState);
 elements.form.elements.issueType.addEventListener("change", updateEvidence);
 
 elements.screenshot.addEventListener("change", async () => {
@@ -204,7 +209,7 @@ elements.clear.addEventListener("click", () => {
   elements.diagnosis.hidden = true;
   elements.draftWrap.hidden = true;
   elements.zonePicker.hidden = true;
-  elements.p1Alert.hidden = true;
+  updateCriticalState();
   removeScreenshot();
   updateEvidence();
   updateProgress();
@@ -266,19 +271,28 @@ function updateProgress() {
     actual: Boolean(data.actual),
     reproduction: Boolean(data.reproduction),
     evidence: Boolean(data.exactErrors || data.rayIds || data.attachments),
+    service: Boolean(data.service),
+    hostname: Boolean(data.hostnames),
+    affectedUsers: Boolean(data.affectedUsers),
+    exactOrRay: Boolean(data.exactErrors || data.rayIds),
+    originStatus: Boolean(data.originFindings),
   };
-  const done = Object.values(complete).filter(Boolean).length;
-  const score = Math.round((done / requiredFields.length) * 100);
+  const fields =
+    data.priority === "P1"
+      ? [...requiredFields, ...criticalRequiredFields]
+      : requiredFields;
+  const done = fields.filter(([key]) => complete[key]).length;
+  const score = Math.round((done / fields.length) * 100);
   elements.score.textContent = String(score);
   elements.progressBar.style.width = `${score}%`;
   elements.progressRing.style.background = `conic-gradient(var(--orange) ${score}%, #ebe8e3 ${score}%)`;
   elements.progressSummary.textContent =
     score === 100
       ? "Core case information is complete."
-      : `${requiredFields.length - done} required item(s) remaining.`;
+      : `${fields.length - done} required item(s) remaining.`;
 
   elements.checklist.replaceChildren(
-    ...requiredFields.map(([key, label]) => {
+    ...fields.map(([key, label]) => {
       const item = document.createElement("li");
       item.textContent = label;
       if (complete[key]) item.className = "done";
@@ -354,7 +368,7 @@ function restoreDraft() {
     for (const [name, value] of Object.entries(saved.form ?? {})) {
       if (elements.form.elements[name]) elements.form.elements[name].value = value;
     }
-    elements.p1Alert.hidden = elements.form.elements.priority.value !== "P1";
+    updateCriticalState();
   } catch {
     localStorage.removeItem(STORAGE_KEY);
   }
@@ -366,6 +380,12 @@ function removeScreenshot() {
   elements.screenshot.value = "";
   elements.fileChip.hidden = true;
   elements.confirmExtraction.checked = false;
+}
+
+function updateCriticalState() {
+  const isCritical = elements.form.elements.priority.value === "P1";
+  elements.p1Alert.hidden = !isCritical;
+  document.body.classList.toggle("is-critical", isCritical);
 }
 
 function readAsDataUrl(file) {
