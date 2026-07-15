@@ -172,7 +172,7 @@ export class CloudflareClient {
       since: input.start,
       before: input.end,
       direction: "desc",
-      per_page: "100",
+      limit: "100",
     });
     if (input.zoneId) query.set("zone_id", input.zoneId);
     return this.api<unknown>(

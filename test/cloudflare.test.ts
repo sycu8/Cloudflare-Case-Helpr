@@ -59,11 +59,9 @@ describe("CloudflareClient", () => {
     );
     const client = new CloudflareClient("secret-token", fetcher);
 
-    await expect(client.listAccounts()).rejects.toMatchObject<
-      Partial<CloudflareApiError>
-    >({
+    await expect(client.listAccounts()).rejects.toMatchObject({
       status: 403,
       message: "Authentication error",
-    });
+    } satisfies Partial<CloudflareApiError>);
   });
 });

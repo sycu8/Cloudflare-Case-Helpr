@@ -74,7 +74,7 @@ Do not use a Global API key.
 
 ## Local development
 
-Requirements: Node.js 18 or newer and a Cloudflare account.
+Requirements: Node.js 22.18 or newer and a Cloudflare account.
 
 ```bash
 npm install
