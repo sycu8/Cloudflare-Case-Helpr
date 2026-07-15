@@ -4,7 +4,7 @@ const VISION_MODEL = "@cf/meta/llama-4-scout-17b-16e-instruct";
 const MAX_IMAGE_DATA_URL_LENGTH = 5_700_000;
 
 export async function analyzeIssueWithOptionalImage(
-  ai: Ai,
+  ai: Pick<Ai, "run">,
   message: string,
   imageDataUrl?: string,
 ): Promise<
@@ -33,10 +33,18 @@ export async function analyzeIssueWithOptionalImage(
       },
       {
         role: "user",
-        content: `Describe the visible error and extract any Cloudflare error code, Ray ID, hostname, HTTP status, and timestamp. Clearly say when a value is uncertain. Customer context: ${redactedInput.text || "No text provided."}`,
+        content: [
+          {
+            type: "text",
+            text: `Describe the visible error and extract any Cloudflare error code, Ray ID, hostname, HTTP status, and timestamp. Clearly say when a value is uncertain. Customer context: ${redactedInput.text || "No text provided."}`,
+          },
+          {
+            type: "image_url",
+            image_url: { url: imageDataUrl },
+          },
+        ],
       },
     ],
-    image: imageDataUrl,
     max_tokens: 700,
   });
 

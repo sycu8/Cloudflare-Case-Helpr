@@ -1,11 +1,23 @@
-# Cloudflare Troubleshooting MCP
+# Cloudflare Support Case Helper
 
-A read-only Model Context Protocol server for collecting Cloudflare evidence
-before opening a Support case. It runs on Cloudflare Workers using Streamable
-HTTP at `/mcp`.
+A responsive troubleshooting application and read-only MCP server for
+collecting Cloudflare evidence and preparing a complete Support case. It runs
+on Cloudflare Workers with Static Assets, Workers AI, and Streamable HTTP MCP.
 
-The server can:
+The browser application can:
 
+- analyze error descriptions and screenshots;
+- identify common Cloudflare errors, Ray IDs, hostnames, and UTC timestamps;
+- guide customers through Cloudflare and origin evidence collection;
+- connect to a customer account using an in-memory, read-only API token;
+- validate case completeness and attachment formats;
+- warn about possible secrets and unsupported P1 priority;
+- save drafts locally on the customer's device; and
+- generate a concise case ready to copy into Cloudflare Support.
+
+The MCP server can:
+
+- perform the same issue analysis, evidence checklist, validation, and drafting;
 - verify a customer-provided API token;
 - list accessible accounts and zones;
 - retrieve an HTTP request by Ray ID through Enterprise Logpull;
@@ -27,9 +39,11 @@ chat message or pass it as a tool argument.
 
 The Worker:
 
-- keeps no customer token or log data in storage;
+- keeps no customer token, screenshot, draft, or log data in server-side storage;
 - never returns the token in a tool response;
 - sends the token only to `api.cloudflare.com`;
+- sends screenshots only to the configured Workers AI binding for the requested
+  analysis;
 - removes URL query strings from request logs by default;
 - does not request client IP or cookie fields;
 - limits Logpull responses to 100 records and 1 MB; and
@@ -64,6 +78,10 @@ Do not use a Global API key.
 | Tool | Purpose |
 | --- | --- |
 | `check_cloudflare_connection` | Verify the connected token |
+| `analyze_issue_input` | Identify errors and troubleshooting signals |
+| `get_required_case_evidence` | Build an issue-specific evidence checklist |
+| `validate_support_case` | Report missing details and safety warnings |
+| `generate_support_case_draft` | Create a copy-ready support case |
 | `list_cloudflare_accounts` | Find accessible account IDs |
 | `list_cloudflare_zones` | Find accessible zone IDs |
 | `lookup_http_request_by_ray_id` | Correlate one request |
@@ -81,8 +99,11 @@ npm install
 npm run dev
 ```
 
-The MCP endpoint is normally `http://localhost:8787/mcp`. Configure an MCP
-client that supports Streamable HTTP and custom headers:
+The browser application is normally available at `http://localhost:8787`, and
+the MCP endpoint is at `http://localhost:8787/mcp`. The Workers AI binding uses
+a remote Cloudflare development connection for screenshot analysis.
+
+Configure an MCP client that supports Streamable HTTP and custom headers:
 
 ```ts
 await client.addMcpServer(
@@ -112,8 +133,16 @@ npm run deploy
 The deployment exposes:
 
 - `/mcp` — authenticated Streamable HTTP MCP endpoint;
+- `/api/analyze` — rules-first text and Workers AI screenshot analysis;
+- `/api/evidence` — adaptive evidence requirements;
+- `/api/case/*` — validation and draft generation;
+- `/api/cloudflare/*` — in-memory customer account connection;
 - `/health` — health check with no customer data; and
-- `/` — service metadata and required permissions.
+- `/` — responsive customer application.
+
+Before offering the application as a public shared service, add Cloudflare
+Turnstile and rate limiting to the screenshot-analysis endpoint, and protect
+the MCP endpoint with Cloudflare Access or OAuth.
 
 ## Current scope
 

@@ -58,7 +58,7 @@ const supportCaseInputSchema = {
   participants: z.string().max(2_000).optional(),
 };
 
-function createServer(client: CloudflareClient): McpServer {
+export function createServer(client: CloudflareClient): McpServer {
   const server = new McpServer({
     name: "Cloudflare Troubleshooting",
     version: "0.1.0",

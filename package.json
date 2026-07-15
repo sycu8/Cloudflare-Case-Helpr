@@ -12,7 +12,8 @@
     "cf-typegen": "wrangler types",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "check": "npm run cf-typegen && npm run typecheck && npm test && wrangler deploy --dry-run"
+    "check:browser": "node --check public/app.js",
+    "check": "npm run cf-typegen && npm run typecheck && npm test && npm run check:browser && wrangler deploy --dry-run"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0",

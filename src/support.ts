@@ -25,26 +25,26 @@ export type IssueAnalysis = {
 };
 
 export type SupportCase = {
-  priority?: "P1" | "P2" | "P3" | "P4";
-  service?: string;
-  issueType?: IssueType;
-  zoneName?: string;
-  zoneId?: string;
-  hostnames?: string;
-  startedUtc?: string;
-  frequency?: string;
-  impact?: string;
-  affectedUsers?: string;
-  expected?: string;
-  actual?: string;
-  reproduction?: string;
-  exampleUrls?: string;
-  exactErrors?: string;
-  rayIds?: string;
-  recentChanges?: string;
-  originFindings?: string;
-  attachments?: string;
-  participants?: string;
+  priority?: "P1" | "P2" | "P3" | "P4" | undefined;
+  service?: string | undefined;
+  issueType?: IssueType | undefined;
+  zoneName?: string | undefined;
+  zoneId?: string | undefined;
+  hostnames?: string | undefined;
+  startedUtc?: string | undefined;
+  frequency?: string | undefined;
+  impact?: string | undefined;
+  affectedUsers?: string | undefined;
+  expected?: string | undefined;
+  actual?: string | undefined;
+  reproduction?: string | undefined;
+  exampleUrls?: string | undefined;
+  exactErrors?: string | undefined;
+  rayIds?: string | undefined;
+  recentChanges?: string | undefined;
+  originFindings?: string | undefined;
+  attachments?: string | undefined;
+  participants?: string | undefined;
 };
 
 type ErrorRule = {
@@ -200,8 +200,8 @@ const ERROR_RULES: Record<string, ErrorRule> = {
 };
 
 const SECRET_PATTERNS = [
-  /\b(?:authorization|api[-_ ]?key|token|password|secret)\s*[:=]\s*\S+/gi,
   /\bBearer\s+[A-Za-z0-9._~+/=-]{12,}/gi,
+  /\b(?:authorization|api[-_ ]?key|token|password|secret)\s*[:=]\s*\S+/gi,
   /-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----[\s\S]*?-----END (?:RSA |EC |OPENSSH )?PRIVATE KEY-----/g,
 ];
 const ACCEPTED_ATTACHMENT_EXTENSIONS = new Set([
