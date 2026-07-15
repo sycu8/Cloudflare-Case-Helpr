@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   analyzeIssueWithOptionalImage,
   translateSupportContent,
+  translateUiContent,
 } from "../src/ai";
 
 describe("screenshot analysis", () => {
@@ -78,5 +79,35 @@ describe("screenshot analysis", () => {
       ],
       temperature: 0,
     });
+  });
+
+  it("returns ordered UI translations for browser caching", async () => {
+    const run = vi.fn().mockResolvedValue({
+      response: JSON.stringify({
+        translations: ["Phân tích sự cố", "Tạo bản nháp"],
+      }),
+    });
+
+    const result = await translateUiContent(
+      { run },
+      ["Analyze issue", "Generate draft"],
+      "vi",
+    );
+
+    expect(result).toEqual(["Phân tích sự cố", "Tạo bản nháp"]);
+    expect(run.mock.calls[0]?.[1]).toMatchObject({
+      response_format: { type: "json_object" },
+      temperature: 0,
+    });
+  });
+
+  it("rejects incomplete UI translation responses", async () => {
+    const run = vi.fn().mockResolvedValue({
+      response: JSON.stringify({ translations: ["តែមួយ"] }),
+    });
+
+    await expect(
+      translateUiContent({ run }, ["One", "Two"], "km"),
+    ).rejects.toThrow(/did not match/);
   });
 });
