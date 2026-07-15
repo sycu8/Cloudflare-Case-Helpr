@@ -83,9 +83,9 @@ describe("screenshot analysis", () => {
 
   it("returns ordered UI translations for browser caching", async () => {
     const run = vi.fn().mockResolvedValue({
-      response: JSON.stringify({
+      response: {
         translations: ["Phân tích sự cố", "Tạo bản nháp"],
-      }),
+      },
     });
 
     const result = await translateUiContent(
