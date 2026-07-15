@@ -6,7 +6,8 @@ on Cloudflare Workers with Static Assets, Workers AI, and Streamable HTTP MCP.
 
 The browser application can:
 
-- analyze error descriptions locally and screenshots with Workers AI;
+- analyze error descriptions locally and screenshots uploaded or pasted
+  directly into the chat with Workers AI;
 - identify common Cloudflare errors, Ray IDs, hostnames, and UTC timestamps;
 - conduct a local adaptive chat that asks only for missing minimum case fields;
 - show Cloudflare and origin evidence-collection guidance with each question;

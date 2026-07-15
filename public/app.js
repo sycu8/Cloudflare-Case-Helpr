@@ -218,10 +218,31 @@ elements.input.addEventListener("keydown", (event) => {
     elements.composer.requestSubmit();
   }
 });
+elements.composer.addEventListener("paste", async (event) => {
+  const imageItem = Array.from(event.clipboardData?.items ?? []).find(
+    (item) => item.kind === "file" && item.type.startsWith("image/"),
+  );
+  const file = imageItem?.getAsFile();
+  if (!file) return;
+  event.preventDefault();
+  await attachScreenshot(file, "Pasted screenshot");
+});
 
 elements.screenshot.addEventListener("change", async () => {
   const file = elements.screenshot.files?.[0];
   if (!file) return;
+  await attachScreenshot(file, file.name);
+});
+
+async function attachScreenshot(file, displayName) {
+  if (state.phase !== "initial") {
+    setStatus(
+      "Screenshots are analyzed when starting a case. Start a new case to paste another error image.",
+      true,
+    );
+    elements.screenshot.value = "";
+    return;
+  }
   if (file.size > MAX_SCREENSHOT_BYTES) {
     setStatus("Screenshot must be 4 MB or smaller.", true);
     removeScreenshot();
@@ -233,10 +254,12 @@ elements.screenshot.addEventListener("change", async () => {
     return;
   }
   screenshotDataUrl = await readAsDataUrl(file);
-  elements.attachmentName.textContent = `${file.name} · ${formatBytes(file.size)}`;
+  elements.attachmentName.textContent = `${displayName || "Screenshot"} · ${formatBytes(file.size)}`;
   elements.attachmentPreview.hidden = false;
-  setStatus("Screenshot will be used for this analysis only and will not be saved.");
-});
+  setStatus(
+    "Screenshot attached. It will be analyzed once and will not be stored with the local chat.",
+  );
+}
 
 elements.removeAttachment.addEventListener("click", removeScreenshot);
 

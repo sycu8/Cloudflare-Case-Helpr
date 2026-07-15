@@ -22,4 +22,11 @@ describe("local chatbot UI", () => {
     expect(script).toContain("What did you find at the origin?");
     expect(script).toContain("P1 requires ongoing customer availability");
   });
+
+  it("accepts screenshots pasted from the clipboard", () => {
+    expect(script).toContain('elements.composer.addEventListener("paste"');
+    expect(script).toContain("event.clipboardData?.items");
+    expect(script).toContain('item.type.startsWith("image/")');
+    expect(html).toContain("paste it here with Ctrl+V or ⌘V");
+  });
 });
