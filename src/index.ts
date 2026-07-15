@@ -2,6 +2,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { createMcpHandler } from "agents/mcp";
 import { z } from "zod";
 
+import { handleApi } from "./api";
 import { CloudflareApiError, CloudflareClient } from "./cloudflare";
 import {
   normalizeRayId,
@@ -9,6 +10,12 @@ import {
   validateId,
   validateLogWindow,
 } from "./diagnostics";
+import {
+  analyzeIssue,
+  generateCaseDraft,
+  getRequiredEvidence,
+  validateSupportCase,
+} from "./support";
 
 const TOKEN_HEADER = "X-Cloudflare-API-Token";
 const idSchema = z
@@ -18,6 +25,38 @@ const utcSchema = z
   .string()
   .datetime({ offset: false })
   .endsWith("Z", "Timestamp must be UTC and end in Z");
+const issueTypeSchema = z.enum([
+  "outage",
+  "performance",
+  "dns",
+  "ssl",
+  "security",
+  "workers",
+  "zero-trust",
+  "other",
+]);
+const supportCaseInputSchema = {
+  priority: z.enum(["P1", "P2", "P3", "P4"]).optional(),
+  service: z.string().max(100).optional(),
+  issueType: issueTypeSchema.optional(),
+  zoneName: z.string().max(253).optional(),
+  zoneId: z.string().max(64).optional(),
+  hostnames: z.string().max(2_000).optional(),
+  startedUtc: z.string().max(50).optional(),
+  frequency: z.string().max(1_000).optional(),
+  impact: z.string().max(5_000).optional(),
+  affectedUsers: z.string().max(2_000).optional(),
+  expected: z.string().max(5_000).optional(),
+  actual: z.string().max(5_000).optional(),
+  reproduction: z.string().max(10_000).optional(),
+  exampleUrls: z.string().max(5_000).optional(),
+  exactErrors: z.string().max(10_000).optional(),
+  rayIds: z.string().max(2_000).optional(),
+  recentChanges: z.string().max(5_000).optional(),
+  originFindings: z.string().max(10_000).optional(),
+  attachments: z.string().max(5_000).optional(),
+  participants: z.string().max(2_000).optional(),
+};
 
 function createServer(client: CloudflareClient): McpServer {
   const server = new McpServer({
@@ -39,6 +78,58 @@ function createServer(client: CloudflareClient): McpServer {
         security:
           "The token was read from the transport header and is never returned by this tool.",
       }),
+  );
+
+  server.registerTool(
+    "analyze_issue_input",
+    {
+      description:
+        "Analyze a customer's error description or text extracted from a screenshot. Detects known Cloudflare errors, Ray IDs, hostnames, and UTC timestamps, then recommends evidence. Never pass an image or secret token as a tool argument.",
+      inputSchema: {
+        message: z.string().min(1).max(20_000),
+        extracted_screenshot_text: z.string().max(10_000).optional(),
+      },
+    },
+    async ({ message, extracted_screenshot_text }) =>
+      toolResult(
+        analyzeIssue(
+          [message, extracted_screenshot_text].filter(Boolean).join("\n"),
+        ),
+      ),
+  );
+
+  server.registerTool(
+    "get_required_case_evidence",
+    {
+      description:
+        "Return the Cloudflare and origin evidence checklist for an issue category.",
+      inputSchema: { issue_type: issueTypeSchema },
+    },
+    async ({ issue_type }) =>
+      toolResult({
+        issue_type,
+        evidence: getRequiredEvidence(issue_type),
+      }),
+  );
+
+  server.registerTool(
+    "validate_support_case",
+    {
+      description:
+        "Check whether a support case has the core information Cloudflare Support needs and warn about possible secrets or an unsupported priority.",
+      inputSchema: supportCaseInputSchema,
+    },
+    async (supportCase) => toolResult(validateSupportCase(supportCase)),
+  );
+
+  server.registerTool(
+    "generate_support_case_draft",
+    {
+      description:
+        "Generate a concise, copy-ready Cloudflare Support case. The response includes validation gaps and redacts secret-like values.",
+      inputSchema: supportCaseInputSchema,
+    },
+    async (supportCase) => toolResult(generateCaseDraft(supportCase)),
   );
 
   server.registerTool(
@@ -327,22 +418,11 @@ export default {
       });
     }
 
-    if (url.pathname !== "/mcp") {
-      return Response.json({
-        name: "Cloudflare Troubleshooting MCP",
-        endpoint: "/mcp",
-        authentication:
-          `Set ${TOKEN_HEADER} as a transport header. Never place a Cloudflare API token in a tool argument or chat message.`,
-        permissions: [
-          "Zone Read",
-          "Analytics Read",
-          "Logs Read (Enterprise Logpull)",
-          "Account Settings Read (audit events)",
-        ],
-        documentation:
-          "https://github.com/sycu8/Cloudflare-Case-Helpr#readme",
-      });
+    if (url.pathname.startsWith("/api/")) {
+      return handleApi(request, env);
     }
+
+    if (url.pathname !== "/mcp") return env.ASSETS.fetch(request);
 
     const token = request.headers.get(TOKEN_HEADER)?.trim();
     if (!token) {
