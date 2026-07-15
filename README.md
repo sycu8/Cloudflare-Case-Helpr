@@ -11,6 +11,8 @@ The browser application can:
 - identify common Cloudflare errors, Ray IDs, hostnames, and UTC timestamps;
 - conduct a local adaptive chat that asks only for missing minimum case fields;
 - show Cloudflare and origin evidence-collection guidance with each question;
+- accept conversational incident times and normalize them to UTC for log
+  correlation;
 - increase requirements automatically for P1 critical incidents;
 - warn about possible secrets and unsupported P1 priority;
 - store chat, answers, and drafts only in the customer's browser;

@@ -1,3 +1,5 @@
+import { parseHumanUtc } from "./chat-utils.js";
+
 const STORAGE_KEY = "cf-support-chat-v2";
 const UI_LANGUAGE_KEY = "cf-support-ui-language";
 const UI_TRANSLATION_VERSION = "chat-v1";
@@ -78,12 +80,15 @@ const questions = {
   startedUtc: {
     prompt: "When did the issue start?",
     guidance:
-      "Use UTC so Cloudflare and origin logs can be correlated. Copy the timestamp from the error page, HAR, monitoring alert, or origin log.",
-    placeholder: "Example: 2026-07-15T03:32:00Z",
-    validate(value) {
-      return /(?:Z|\bUTC\b)/i.test(value) && !Number.isNaN(Date.parse(value.replace(/\s+UTC$/i, "Z")))
+      "Use the time shown on the error page, HAR, monitoring alert, or origin log. You can answer naturally, for example “today at 2:43 PM UTC” or “15 July 2026 14:43 UTC.” I will convert it to UTC.",
+    placeholder: "Example: today at 2:43 PM UTC",
+    normalize(value) {
+      return parseHumanUtc(value);
+    },
+    validate(value, normalized) {
+      return normalized
         ? ""
-        : "Please provide a valid UTC timestamp ending in Z or UTC.";
+        : "I could not understand that date. Try “today at 2:43 PM UTC” or “15 July 2026 14:43 UTC.”";
     },
   },
   frequency: {
@@ -485,7 +490,9 @@ function handleQuestionAnswer(value, displayValue) {
     value = match.value;
     displayValue = match.label;
   }
-  const validationError = question.validate?.(value) ?? "";
+  const normalizedValue = question.normalize?.(value) ?? value;
+  const validationError =
+    question.validate?.(value, normalizedValue) ?? "";
   if (validationError) {
     setStatus(validationError, true);
     return;
@@ -499,7 +506,15 @@ function handleQuestionAnswer(value, displayValue) {
     ].map((match) => match[1]);
     if (rayIds.length) state.caseData.rayIds = [...new Set(rayIds)].join(", ");
   } else {
-    state.caseData[questionId] = value;
+    state.caseData[questionId] = normalizedValue;
+  }
+
+  if (questionId === "startedUtc" && normalizedValue !== value) {
+    addMessage(
+      "assistant",
+      `I interpreted that as ${normalizedValue}.`,
+      "This normalized value will be used to correlate Cloudflare and origin logs.",
+    );
   }
 
   if (questionId === "priority" && value === "P1") {
