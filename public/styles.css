@@ -89,6 +89,47 @@ a {
   gap: 14px;
 }
 
+.language-menu {
+  position: relative;
+}
+
+.language-menu-toggle {
+  gap: 6px;
+}
+
+.language-menu-popover {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 30;
+  min-width: 150px;
+  padding: 6px;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  box-shadow: var(--shadow);
+}
+
+.language-menu-popover:not([hidden]) {
+  display: grid;
+}
+
+.language-menu-popover button {
+  padding: 9px 10px;
+  color: var(--ink);
+  text-align: left;
+  background: transparent;
+  border: 0;
+  border-radius: 7px;
+  font-size: 0.82rem;
+}
+
+.language-menu-popover button:hover,
+.language-menu-popover button.active {
+  color: var(--orange-dark);
+  background: var(--orange-soft);
+}
+
 .save-state,
 .action-status,
 .hint {

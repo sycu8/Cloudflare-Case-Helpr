@@ -3,6 +3,7 @@ import { z } from "zod";
 import {
   analyzeIssueWithOptionalImage,
   translateSupportContent,
+  translateUiContent,
 } from "./ai";
 import { CloudflareApiError, CloudflareClient } from "./cloudflare";
 import {
@@ -98,6 +99,22 @@ export async function handleApi(
           body.targetLanguage,
         ),
       );
+    }
+
+    if (url.pathname === "/api/translate-ui" && request.method === "POST") {
+      const body = z
+        .object({
+          strings: z.array(z.string().min(1).max(500)).min(1).max(250),
+          targetLanguage: z.enum(["vi", "km"]),
+        })
+        .parse(await readJson(request));
+      return Response.json({
+        translations: await translateUiContent(
+          env.AI,
+          body.strings,
+          body.targetLanguage,
+        ),
+      });
     }
 
     if (url.pathname === "/api/case/validate" && request.method === "POST") {

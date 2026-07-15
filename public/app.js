@@ -1,4 +1,6 @@
 const STORAGE_KEY = "cf-support-case-helper-v1";
+const UI_LANGUAGE_KEY = "cf-support-ui-language";
+const UI_TRANSLATION_VERSION = "v1";
 const MAX_SCREENSHOT_BYTES = 4 * 1024 * 1024;
 
 const elements = {
@@ -40,12 +42,20 @@ const elements = {
   copyStatus: document.querySelector("#copy-status"),
   clear: document.querySelector("#clear-data"),
   saveState: document.querySelector("#save-state"),
+  languageMenu: document.querySelector("#language-menu"),
+  languageMenuToggle: document.querySelector("#language-menu-toggle"),
+  languageMenuPopover: document.querySelector("#language-menu-popover"),
+  currentLanguage: document.querySelector("#current-language"),
+  uiLanguageButtons: document.querySelectorAll("[data-ui-language]"),
 };
 
 let screenshotDataUrl;
 let pendingScreenshotAnalysis;
 let sourceDraft;
 let saveTimer;
+const uiTranslationEntries = captureUiTranslationEntries();
+const uiSourceStrings = uiTranslationEntries.map((entry) => entry.original);
+const uiSourceHash = hashStrings(uiSourceStrings);
 
 const requiredFields = [
   ["priority", "Priority"],
@@ -69,6 +79,28 @@ const criticalRequiredFields = [
 restoreDraft();
 updateEvidence();
 updateProgress();
+initializeUiLanguage();
+
+elements.languageMenuToggle.addEventListener("click", () => {
+  const willOpen = elements.languageMenuPopover.hidden;
+  elements.languageMenuPopover.hidden = !willOpen;
+  elements.languageMenuToggle.setAttribute("aria-expanded", String(willOpen));
+});
+
+for (const button of elements.uiLanguageButtons) {
+  button.addEventListener("click", async () => {
+    elements.languageMenuPopover.hidden = true;
+    elements.languageMenuToggle.setAttribute("aria-expanded", "false");
+    await setUiLanguage(button.dataset.uiLanguage);
+  });
+}
+
+document.addEventListener("click", (event) => {
+  if (!elements.languageMenu.contains(event.target)) {
+    elements.languageMenuPopover.hidden = true;
+    elements.languageMenuToggle.setAttribute("aria-expanded", "false");
+  }
+});
 
 elements.message.addEventListener("input", scheduleSave);
 elements.form.addEventListener("input", () => {
@@ -460,6 +492,160 @@ function setActiveLanguage(language) {
   for (const button of elements.languageButtons) {
     button.classList.toggle("active", button.dataset.language === language);
   }
+}
+
+function captureUiTranslationEntries() {
+  const entries = [];
+  const blocked = [
+    "script",
+    "style",
+    "textarea",
+    "input",
+    ".language-menu",
+    ".language-buttons",
+    ".action-status",
+    "#diagnosis",
+    "#checklist",
+    "#issue-evidence",
+    "#progress-summary",
+    "#validation-message",
+    "#draft-output",
+    "[data-no-translate]",
+  ].join(",");
+  const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, {
+    acceptNode(node) {
+      const value = node.nodeValue?.trim() ?? "";
+      const parent = node.parentElement;
+      if (
+        !value ||
+        !/[A-Za-z]/.test(value) ||
+        !parent ||
+        parent.closest(blocked)
+      ) {
+        return NodeFilter.FILTER_REJECT;
+      }
+      return NodeFilter.FILTER_ACCEPT;
+    },
+  });
+  let node;
+  while ((node = walker.nextNode())) {
+    const fullValue = node.nodeValue ?? "";
+    const original = fullValue.trim();
+    entries.push({
+      kind: "text",
+      node,
+      original,
+      leading: fullValue.match(/^\s*/)?.[0] ?? "",
+      trailing: fullValue.match(/\s*$/)?.[0] ?? "",
+    });
+  }
+  for (const element of document.querySelectorAll(
+    "input[placeholder], textarea[placeholder]",
+  )) {
+    const original = element.getAttribute("placeholder")?.trim();
+    if (original && /[A-Za-z]/.test(original)) {
+      entries.push({
+        kind: "attribute",
+        element,
+        attribute: "placeholder",
+        original,
+      });
+    }
+  }
+  return entries;
+}
+
+async function initializeUiLanguage() {
+  const preferred = localStorage.getItem(UI_LANGUAGE_KEY) ?? "en";
+  if (["en", "vi", "km"].includes(preferred)) {
+    await setUiLanguage(preferred);
+  }
+}
+
+async function setUiLanguage(language) {
+  const names = { en: "English", vi: "Tiếng Việt", km: "ខ្មែរ" };
+  if (!names[language]) return;
+  setUiLanguageBusy(true);
+  elements.currentLanguage.textContent =
+    language === "en" ? names.en : "Translating…";
+  try {
+    let translations = uiSourceStrings;
+    if (language !== "en") {
+      const cacheKey = `${UI_TRANSLATION_VERSION}:${language}:${uiSourceHash}`;
+      const cached = readUiTranslationCache(cacheKey);
+      if (cached) {
+        translations = cached;
+      } else {
+        const result = await api("/api/translate-ui", {
+          method: "POST",
+          body: JSON.stringify({
+            strings: uiSourceStrings,
+            targetLanguage: language,
+          }),
+        });
+        translations = result.translations;
+        localStorage.setItem(cacheKey, JSON.stringify(translations));
+      }
+    }
+    applyUiTranslations(translations);
+    document.documentElement.lang = language;
+    localStorage.setItem(UI_LANGUAGE_KEY, language);
+    elements.currentLanguage.textContent = names[language];
+    for (const button of elements.uiLanguageButtons) {
+      button.classList.toggle(
+        "active",
+        button.dataset.uiLanguage === language,
+      );
+    }
+  } catch (error) {
+    elements.currentLanguage.textContent = names.en;
+    setStatus(elements.saveState, `Translation unavailable: ${error.message}`, true);
+  } finally {
+    setUiLanguageBusy(false);
+  }
+}
+
+function applyUiTranslations(translations) {
+  if (!Array.isArray(translations) || translations.length !== uiTranslationEntries.length) {
+    throw new Error("Cached translation does not match this page version");
+  }
+  uiTranslationEntries.forEach((entry, index) => {
+    const translation = translations[index];
+    if (typeof translation !== "string") return;
+    if (entry.kind === "text") {
+      entry.node.nodeValue = `${entry.leading}${translation}${entry.trailing}`;
+    } else {
+      entry.element.setAttribute(entry.attribute, translation);
+    }
+  });
+}
+
+function readUiTranslationCache(cacheKey) {
+  try {
+    const cached = JSON.parse(localStorage.getItem(cacheKey) ?? "null");
+    return Array.isArray(cached) &&
+      cached.length === uiTranslationEntries.length &&
+      cached.every((value) => typeof value === "string")
+      ? cached
+      : undefined;
+  } catch {
+    localStorage.removeItem(cacheKey);
+    return undefined;
+  }
+}
+
+function setUiLanguageBusy(busy) {
+  elements.languageMenuToggle.disabled = busy;
+  for (const button of elements.uiLanguageButtons) button.disabled = busy;
+}
+
+function hashStrings(values) {
+  let hash = 2166136261;
+  for (const character of values.join("\u241f")) {
+    hash ^= character.charCodeAt(0);
+    hash = Math.imul(hash, 16777619);
+  }
+  return (hash >>> 0).toString(16);
 }
 
 function formatBytes(bytes) {

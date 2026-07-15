@@ -93,12 +93,60 @@ export async function translateSupportContent(
   };
 }
 
+export async function translateUiContent(
+  ai: Pick<Ai, "run">,
+  strings: string[],
+  targetLanguage: "vi" | "km",
+): Promise<string[]> {
+  if (strings.length === 0 || strings.length > 250) {
+    throw new Error("UI translation requires between 1 and 250 strings");
+  }
+  const source = strings.map((value) => value.slice(0, 500));
+  const response = await ai.run(VISION_MODEL, {
+    messages: [
+      {
+        role: "system",
+        content:
+          "Translate user-interface text for a Cloudflare troubleshooting application. Preserve Cloudflare product names, P1/P2/P3/P4, HTTP codes, Ray ID, UTC, URLs, file extensions, and technical abbreviations. Return only a JSON object with one key named translations. Its value must be an array with exactly the same number and order of strings as the input. Do not add explanations.",
+      },
+      {
+        role: "user",
+        content: `Target language: ${LANGUAGE_NAMES[targetLanguage]}\nInput JSON: ${JSON.stringify(source)}`,
+      },
+    ],
+    response_format: { type: "json_object" },
+    max_tokens: 8_000,
+    temperature: 0,
+  });
+  const parsed = parseTranslationJson(getResponseText(response));
+  if (
+    !Array.isArray(parsed.translations) ||
+    parsed.translations.length !== source.length ||
+    !parsed.translations.every((value) => typeof value === "string")
+  ) {
+    throw new Error("The UI translation response did not match the source content");
+  }
+  return parsed.translations;
+}
+
 function validateImage(dataUrl: string): void {
   if (dataUrl.length > MAX_IMAGE_DATA_URL_LENGTH) {
     throw new Error("Screenshot must be 4 MB or smaller");
   }
   if (!/^data:image\/(?:png|jpeg|gif|webp);base64,[A-Za-z0-9+/=\s]+$/.test(dataUrl)) {
     throw new Error("Screenshot must be a PNG, JPEG, GIF, or WebP image");
+  }
+}
+
+function parseTranslationJson(value: string): { translations?: unknown } {
+  const normalized = value
+    .trim()
+    .replace(/^```(?:json)?\s*/i, "")
+    .replace(/\s*```$/, "");
+  try {
+    return JSON.parse(normalized) as { translations?: unknown };
+  } catch {
+    throw new Error("The UI translation model returned invalid JSON");
   }
 }
 

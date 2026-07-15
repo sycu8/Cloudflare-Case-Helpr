@@ -18,6 +18,24 @@
         <span>Support Case Helper</span>
       </a>
       <div class="top-actions">
+        <div class="language-menu" id="language-menu">
+          <button
+            class="button button-ghost button-small language-menu-toggle"
+            id="language-menu-toggle"
+            type="button"
+            aria-haspopup="menu"
+            aria-expanded="false"
+          >
+            <span aria-hidden="true">◎</span>
+            <span id="current-language">English</span>
+            <span aria-hidden="true">▾</span>
+          </button>
+          <div class="language-menu-popover" id="language-menu-popover" role="menu" hidden>
+            <button type="button" role="menuitem" data-ui-language="en">English</button>
+            <button type="button" role="menuitem" data-ui-language="vi">Tiếng Việt</button>
+            <button type="button" role="menuitem" data-ui-language="km">ខ្មែរ</button>
+          </div>
+        </div>
         <span class="save-state" id="save-state">Saved on this device</span>
         <button class="button button-ghost button-small" id="clear-data" type="button">
           Clear all data

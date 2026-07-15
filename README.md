@@ -15,7 +15,9 @@ The browser application can:
 - save drafts locally on the customer's device; and
 - generate a concise case ready to copy into Cloudflare Support;
 - translate generated drafts into English, Vietnamese, or Khmer while
-  preserving technical identifiers.
+  preserving technical identifiers; and
+- switch the full website interface from the persistent language menu, with
+  translated UI content cached locally by language and content version.
 
 The MCP server can:
 
@@ -167,6 +169,7 @@ The deployment exposes:
 - `/mcp` — authenticated Streamable HTTP MCP endpoint;
 - `/api/analyze` — rules-first text and Workers AI screenshot analysis;
 - `/api/translate` — English, Vietnamese, and Khmer case translation;
+- `/api/translate-ui` — ordered website-interface translation for local caching;
 - `/api/evidence` — adaptive evidence requirements;
 - `/api/case/*` — validation and draft generation;
 - `/api/cloudflare/*` — in-memory customer account connection;
