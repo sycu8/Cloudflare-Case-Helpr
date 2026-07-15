@@ -141,6 +141,10 @@ environment secrets. Create a separate deployment token using Cloudflare's
 **Edit Cloudflare Workers** API token template and scope it to the deployment
 account. Do not reuse a customer's troubleshooting token for deployment.
 
+The included `.github/workflows/deploy.yml` workflow verifies and deploys the
+application when changes reach `main`. It also supports manual runs from the
+GitHub Actions page.
+
 When deploying from a Cursor Cloud Agent, you can instead authenticate the
 `Cloudflare-builds` MCP integration from the agent's **MCP** menu. Cursor IDE
 authentication under **Settings → Tools & MCP** is separate from Cloud Agent
