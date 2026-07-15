@@ -125,10 +125,36 @@ windows narrow and in UTC.
 
 ## Validate and deploy
 
+First authenticate the deployment environment using one of these methods:
+
+### Wrangler login
+
+```bash
+npx wrangler login
+npx wrangler whoami
+```
+
+### CI or Cloud Agent
+
+Set `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` as protected
+environment secrets. Create a separate deployment token using Cloudflare's
+**Edit Cloudflare Workers** API token template and scope it to the deployment
+account. Do not reuse a customer's troubleshooting token for deployment.
+
+When deploying from a Cursor Cloud Agent, you can instead authenticate the
+`Cloudflare-builds` MCP integration from the agent's **MCP** menu. Cursor IDE
+authentication under **Settings → Tools & MCP** is separate from Cloud Agent
+authentication.
+
+Verify and deploy:
+
 ```bash
 npm run check
 npm run deploy
 ```
+
+`wrangler deploy --temporary` creates a temporary preview and is not a
+production deployment for this application.
 
 The deployment exposes:
 
