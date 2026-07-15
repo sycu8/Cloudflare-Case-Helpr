@@ -5,17 +5,17 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta
       name="description"
-      content="Collect evidence, troubleshoot Cloudflare errors, and prepare a complete Support case."
+      content="A local-first chatbot that collects evidence and prepares complete Cloudflare Support cases."
     />
-    <title>Cloudflare Support Case Helper</title>
+    <title>Cloudflare Support Case Assistant</title>
     <link rel="stylesheet" href="/styles.css" />
     <script type="module" src="/app.js"></script>
   </head>
   <body>
     <header class="topbar">
-      <a class="brand" href="/" aria-label="Support Case Helper home">
+      <a class="brand" href="/" aria-label="Support Case Assistant home">
         <span class="brand-mark" aria-hidden="true">CF</span>
-        <span>Support Case Helper</span>
+        <span>Support Case Assistant</span>
       </a>
       <div class="top-actions">
         <div class="language-menu" id="language-menu">
@@ -36,373 +36,147 @@
             <button type="button" role="menuitem" data-ui-language="km">ខ្មែរ</button>
           </div>
         </div>
-        <span class="save-state" id="save-state">Saved on this device</span>
-        <button class="button button-ghost button-small" id="clear-data" type="button">
-          Clear all data
+        <span class="local-state">
+          <span class="local-dot" aria-hidden="true"></span>
+          Stored locally
+        </span>
+        <button class="button button-ghost button-small" id="clear-chat" type="button">
+          New case
         </button>
       </div>
     </header>
 
     <main>
-      <section class="hero">
-        <p class="eyebrow">Cloudflare troubleshooting assistant</p>
-        <h1>Turn an error into a complete Support case.</h1>
-        <p class="hero-copy">
-          Describe what happened or attach a screenshot. We will identify likely
-          causes, guide your checks, and prepare a draft for Cloudflare Support.
-        </p>
-        <div class="privacy-note">
-          <span aria-hidden="true">●</span>
-          Your draft stays in this browser. Never include passwords, API keys,
-          private keys, cookies, or payment information.
+      <section class="intro">
+        <div>
+          <p class="eyebrow">Local-first guided troubleshooting</p>
+          <h1>Tell us the error. We’ll ask for the rest.</h1>
+          <p>
+            The assistant asks only the missing questions, explains how to
+            collect each answer, and builds a case ready for Cloudflare Support.
+          </p>
+        </div>
+        <div class="privacy-chip">
+          <span aria-hidden="true">◆</span>
+          Chat and answers are stored only in this browser. Screenshots and
+          content are sent to Workers AI only when you use analysis or
+          translation. Never share secrets or payment data.
         </div>
       </section>
 
-      <div class="workspace">
-        <div class="flow">
-          <section class="card step-card" aria-labelledby="describe-title">
-            <div class="step-heading">
-              <span class="step-number">1</span>
-              <div>
-                <p class="step-label">What happened?</p>
-                <h2 id="describe-title">Share the error</h2>
-              </div>
-            </div>
-            <label for="issue-message">
-              Error or issue description
-              <span class="hint">Include an affected URL and UTC time if available.</span>
-            </label>
-            <textarea
-              id="issue-message"
-              rows="6"
-              placeholder="Example: Users receive Error 522 on api.example.com. Ray ID 8e9b1c60ef9e1c9a at 2026-07-15T03:32:00Z."
-            ></textarea>
-
-            <div class="upload-row">
-              <label class="upload" for="screenshot">
-                <span class="upload-icon" aria-hidden="true">＋</span>
-                <span>
-                  <strong>Add screenshot</strong>
-                  <small>PNG, JPG, GIF or WebP · 4 MB maximum</small>
-                </span>
-              </label>
-              <input
-                id="screenshot"
-                type="file"
-                accept="image/png,image/jpeg,image/gif,image/webp"
-                hidden
-              />
-              <div class="file-chip" id="file-chip" hidden>
-                <span id="file-name"></span>
-                <button id="remove-file" type="button" aria-label="Remove screenshot">×</button>
-              </div>
-            </div>
-
-            <div class="form-action">
-              <button class="button button-primary" id="analyze" type="button">
-                Analyze issue
-              </button>
-              <span class="action-status" id="analyze-status" role="status"></span>
-            </div>
-
-            <div class="diagnosis" id="diagnosis" hidden aria-live="polite">
-              <div class="diagnosis-top">
-                <div>
-                  <p class="result-label">Likely issue</p>
-                  <h3 id="diagnosis-title"></h3>
-                </div>
-                <span class="confidence" id="confidence"></span>
-              </div>
-              <p id="diagnosis-explanation"></p>
-              <div id="screenshot-summary-wrap" hidden>
-                <h4>Visible screenshot details</h4>
-                <p id="screenshot-summary"></p>
-                <label class="confirmation">
-                  <input id="confirm-extraction" type="checkbox" />
-                  I confirmed the extracted screenshot details are correct.
-                </label>
-              </div>
-              <div class="result-grid">
-                <div>
-                  <h4>Next checks</h4>
-                  <ol id="next-checks"></ol>
-                </div>
-                <div>
-                  <h4>Evidence needed</h4>
-                  <ul id="analysis-evidence"></ul>
-                </div>
-              </div>
-              <p class="disclaimer">
-                This is a likely diagnosis, not a confirmed root cause.
-              </p>
-            </div>
-          </section>
-
-          <section class="card step-card" aria-labelledby="connect-title">
-            <div class="step-heading">
-              <span class="step-number">2</span>
-              <div>
-                <p class="step-label">Optional account evidence</p>
-                <h2 id="connect-title">Connect Cloudflare</h2>
-              </div>
-            </div>
-            <p class="section-copy">
-              Use a temporary, read-only API token to select the affected zone.
-              The token remains in memory and is never saved with your draft.
-            </p>
-            <details class="connect-panel">
-              <summary>Connect a Cloudflare account</summary>
-              <div class="connect-content">
-                <label for="api-token">
-                  Read-only API token
-                  <span class="hint">Use Zone Read; add Analytics Read or Logs Read only when needed.</span>
-                </label>
-                <div class="inline-control">
-                  <input
-                    id="api-token"
-                    type="password"
-                    autocomplete="off"
-                    placeholder="Token is not stored"
-                  />
-                  <button class="button button-secondary" id="connect" type="button">
-                    Connect
-                  </button>
-                </div>
-                <p class="action-status" id="connect-status" role="status"></p>
-                <div id="zone-picker" hidden>
-                  <label for="zone-select">Affected zone</label>
-                  <select id="zone-select">
-                    <option value="">Choose a zone</option>
-                  </select>
-                </div>
-              </div>
-            </details>
-          </section>
-
-          <section class="card step-card" aria-labelledby="evidence-title">
-            <div class="step-heading">
-              <span class="step-number">3</span>
-              <div>
-                <p class="step-label">Collect evidence</p>
-                <h2 id="evidence-title">Complete the incident details</h2>
-              </div>
-            </div>
-
-            <div class="alert alert-critical" id="p1-alert" hidden>
-              <strong>Critical Enterprise incident?</strong>
-              Check the
-              <a href="https://www.cloudflarestatus.com/" target="_blank" rel="noreferrer">Cloudflare Status page</a>
-              first. For an active outage or attack, use the Emergency hotline tile
-              in your Cloudflare Dashboard. This helper does not escalate emergencies.
-              <span class="critical-mandatory">
-                P1 mandatory fields are marked below. Include the affected service
-                and users, UTC start time, impact, frequency, reproduction, an exact
-                error or Ray ID, and the origin investigation status.
-              </span>
-            </div>
-
-            <form id="case-form">
-              <fieldset>
-                <legend>Scope and impact</legend>
-                <div class="field-grid">
-                  <label>
-                    Issue type
-                    <select name="issueType">
-                      <option value="outage">Outage or availability</option>
-                      <option value="performance">Performance</option>
-                      <option value="dns">DNS</option>
-                      <option value="ssl">SSL / TLS</option>
-                      <option value="security">Security or WAF</option>
-                      <option value="workers">Workers</option>
-                      <option value="zero-trust">Cloudflare One / Zero Trust</option>
-                      <option value="other">Other</option>
-                    </select>
-                  </label>
-                  <label>
-                    Priority
-                    <select name="priority">
-                      <option value="">Choose priority</option>
-                      <option value="P1">P1 · Critical impact</option>
-                      <option value="P2">P2 · High impact</option>
-                      <option value="P3">P3 · Moderate impact</option>
-                      <option value="P4">P4 · Low / question</option>
-                    </select>
-                  </label>
-                  <label>
-                    Cloudflare service
-                    <span class="critical-note">Required for P1</span>
-                    <input name="service" placeholder="CDN, DNS, WAF, Workers…" />
-                  </label>
-                  <label>
-                    Started in UTC
-                    <span class="critical-note">Required for P1</span>
-                    <input name="startedUtc" type="datetime-local" />
-                  </label>
-                  <label>
-                    Zone name
-                    <input name="zoneName" placeholder="example.com" />
-                  </label>
-                  <label>
-                    Zone ID
-                    <input name="zoneId" placeholder="32-character ID" />
-                  </label>
-                  <label class="span-2">
-                    Affected hostname(s)
-                    <span class="critical-note">Required for P1</span>
-                    <input name="hostnames" placeholder="api.example.com" />
-                  </label>
-                  <label>
-                    Frequency
-                    <span class="critical-note">Required for P1</span>
-                    <input name="frequency" placeholder="Every request, intermittent, once…" />
-                  </label>
-                  <label>
-                    Affected users or regions
-                    <span class="critical-note">Required for P1</span>
-                    <input name="affectedUsers" placeholder="All users, APAC only, one ISP…" />
-                  </label>
-                  <label class="span-2">
-                    Production and business impact
-                    <span class="critical-note">Required for P1</span>
-                    <textarea name="impact" rows="3" placeholder="What cannot users or the business do?"></textarea>
-                  </label>
-                </div>
-              </fieldset>
-
-              <fieldset>
-                <legend>Behavior and reproduction</legend>
-                <div class="field-grid">
-                  <label class="span-2">
-                    Expected behavior
-                    <span class="critical-note">Required for P1</span>
-                    <textarea name="expected" rows="3"></textarea>
-                  </label>
-                  <label class="span-2">
-                    Actual behavior
-                    <span class="critical-note">Required for P1</span>
-                    <textarea name="actual" rows="3"></textarea>
-                  </label>
-                  <label class="span-2">
-                    Steps to reproduce
-                    <span class="critical-note">Required for P1</span>
-                    <textarea name="reproduction" rows="4" placeholder="1. Open…&#10;2. Submit…&#10;3. Observe…"></textarea>
-                  </label>
-                  <label class="span-2">
-                    Example URL(s)
-                    <textarea name="exampleUrls" rows="2" placeholder="Remove sensitive query parameters."></textarea>
-                  </label>
-                  <label class="span-2">
-                    Exact error message(s)
-                    <span class="critical-note">Exact error or Ray ID required for P1</span>
-                    <textarea name="exactErrors" rows="3"></textarea>
-                  </label>
-                  <label class="span-2">
-                    Ray ID(s)
-                    <span class="critical-note">Exact error or Ray ID required for P1</span>
-                    <input name="rayIds" placeholder="One or more Ray IDs from failed requests" />
-                  </label>
-                </div>
-              </fieldset>
-
-              <fieldset>
-                <legend>Investigation</legend>
-                <div class="field-grid">
-                  <label class="span-2">
-                    Recent changes
-                    <textarea name="recentChanges" rows="3" placeholder="Cloudflare configuration, origin deployment, certificate or network changes"></textarea>
-                  </label>
-                  <label class="span-2">
-                    Origin and log findings
-                    <span class="critical-note">Investigation status required for P1</span>
-                    <textarea name="originFindings" rows="4" placeholder="Include matching UTC timestamps, not secrets."></textarea>
-                  </label>
-                  <label class="span-2">
-                    Attachments prepared
-                    <textarea name="attachments" rows="3" placeholder="HAR, screenshot.png, origin-log.txt, mtr.txt"></textarea>
-                    <span class="hint">Cloudflare accepts supported files up to 20 MB. Do not ZIP HAR files.</span>
-                  </label>
-                  <label class="span-2">
-                    Case participants
-                    <input name="participants" placeholder="People to CC" />
-                  </label>
-                </div>
-              </fieldset>
-            </form>
-          </section>
-
-          <section class="card step-card" aria-labelledby="draft-title">
-            <div class="step-heading">
-              <span class="step-number">4</span>
-              <div>
-                <p class="step-label">Case draft</p>
-                <h2 id="draft-title">Review and copy</h2>
-              </div>
-            </div>
-            <div id="validation-message" class="validation-message">
-              Complete the required details to generate your case.
-            </div>
-            <div class="form-action">
-              <button class="button button-primary" id="generate-draft" type="button">
-                Generate case draft
-              </button>
-            </div>
-            <div id="draft-wrap" hidden>
-              <div class="translation-toolbar" aria-label="Translate case draft">
-                <div>
-                  <strong>Translate draft</strong>
-                  <span>Cloudflare Support officially handles cases in English.</span>
-                </div>
-                <div class="language-buttons">
-                  <button class="language-button" type="button" data-language="en">
-                    English
-                  </button>
-                  <button class="language-button" type="button" data-language="vi">
-                    Tiếng Việt
-                  </button>
-                  <button class="language-button" type="button" data-language="km">
-                    ខ្មែរ
-                  </button>
-                </div>
-              </div>
-              <textarea id="draft-output" class="draft-output" rows="28" readonly></textarea>
-              <div class="draft-actions">
-                <button class="button button-primary" id="copy-draft" type="button">
-                  Copy draft
-                </button>
-                <a
-                  class="button button-secondary"
-                  href="https://dash.cloudflare.com/?to=/:account/support"
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  Open Cloudflare Support
-                </a>
-              </div>
-              <p class="action-status" id="copy-status" role="status"></p>
-            </div>
-          </section>
-        </div>
-
-        <aside class="progress-card" aria-labelledby="progress-title">
-          <div class="progress-header">
+      <div class="app-layout">
+        <section class="chat-card" aria-label="Support case chat">
+          <div class="chat-header">
+            <div class="assistant-avatar" aria-hidden="true">CF</div>
             <div>
-              <p class="step-label">Case readiness</p>
-              <h2 id="progress-title"><span id="score">0</span>%</h2>
+              <h2>Case Assistant</h2>
+              <p><span class="online-dot"></span> Ready · Local conversation</p>
             </div>
-            <div class="progress-ring" id="progress-ring" aria-hidden="true"></div>
           </div>
-          <div class="progress-bar" aria-hidden="true"><span id="progress-bar"></span></div>
-          <p id="progress-summary">Start by describing the issue.</p>
-          <h3>Required information</h3>
-          <ul class="checklist" id="checklist"></ul>
-          <h3>Issue evidence</h3>
-          <ul class="evidence-list" id="issue-evidence"></ul>
+
+          <div class="messages" id="messages" aria-live="polite"></div>
+
+          <div class="quick-replies" id="quick-replies" hidden></div>
+
+          <div class="attachment-preview" id="attachment-preview" hidden>
+            <span id="attachment-name"></span>
+            <button id="remove-attachment" type="button" aria-label="Remove screenshot">×</button>
+          </div>
+
+          <form class="composer" id="composer">
+            <label class="attach-button" for="screenshot" title="Add screenshot">
+              <span aria-hidden="true">＋</span>
+              <span class="sr-only">Add screenshot</span>
+            </label>
+            <input
+              id="screenshot"
+              type="file"
+              accept="image/png,image/jpeg,image/gif,image/webp"
+              hidden
+            />
+            <textarea
+              id="chat-input"
+              rows="1"
+              placeholder="Describe the error or answer the question…"
+              aria-label="Chat message"
+            ></textarea>
+            <button class="send-button" id="send-message" type="submit">
+              <span>Send</span>
+              <span aria-hidden="true">↑</span>
+            </button>
+          </form>
+          <p class="composer-status" id="composer-status" role="status"></p>
+        </section>
+
+        <aside class="case-panel">
+          <section class="panel-section readiness-section">
+            <div class="panel-heading">
+              <div>
+                <p class="panel-label">Case readiness</p>
+                <h2><span id="readiness-score">0</span>%</h2>
+              </div>
+              <div class="progress-ring" id="progress-ring" aria-hidden="true"></div>
+            </div>
+            <div class="progress-bar" aria-hidden="true">
+              <span id="progress-bar"></span>
+            </div>
+            <p class="readiness-copy" id="readiness-copy">
+              Share the error to begin.
+            </p>
+          </section>
+
+          <section class="panel-section">
+            <div class="section-title-row">
+              <h3>Collected information</h3>
+              <span id="answer-count">0 items</span>
+            </div>
+            <dl class="collected-list" id="collected-list">
+              <div class="empty-state">Answers will appear here as we chat.</div>
+            </dl>
+          </section>
+
+          <section class="panel-section evidence-panel">
+            <h3>Evidence checklist</h3>
+            <ul id="evidence-list">
+              <li>Issue-specific guidance appears after analysis.</li>
+            </ul>
+          </section>
+
+          <section class="panel-section draft-panel" id="draft-panel" hidden>
+            <div class="section-title-row">
+              <h3>Support case draft</h3>
+              <span class="ready-badge">Ready</span>
+            </div>
+            <textarea id="draft-output" rows="18" readonly></textarea>
+            <div class="draft-language">
+              <span>Translate draft</span>
+              <div>
+                <button type="button" data-draft-language="en">English</button>
+                <button type="button" data-draft-language="vi">Tiếng Việt</button>
+                <button type="button" data-draft-language="km">ខ្មែរ</button>
+              </div>
+            </div>
+            <button class="button button-primary button-wide" id="copy-draft" type="button">
+              Copy case draft
+            </button>
+            <a
+              class="button button-secondary button-wide"
+              href="https://dash.cloudflare.com/?to=/:account/support"
+              target="_blank"
+              rel="noreferrer"
+            >
+              Open Cloudflare Support
+            </a>
+            <p class="draft-note" id="draft-status">
+              Cloudflare Support officially handles cases in English.
+            </p>
+          </section>
         </aside>
       </div>
     </main>
 
     <footer>
-      <p>Support Case Helper does not submit cases or confirm root cause.</p>
+      <span>This assistant suggests likely causes; it does not confirm root cause or submit cases.</span>
       <a
         href="https://developers.cloudflare.com/support/contacting-cloudflare-support/"
         target="_blank"

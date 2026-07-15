@@ -6,14 +6,15 @@ on Cloudflare Workers with Static Assets, Workers AI, and Streamable HTTP MCP.
 
 The browser application can:
 
-- analyze error descriptions and screenshots;
+- analyze error descriptions locally and screenshots with Workers AI;
 - identify common Cloudflare errors, Ray IDs, hostnames, and UTC timestamps;
-- guide customers through Cloudflare and origin evidence collection;
-- connect to a customer account using an in-memory, read-only API token;
-- validate case completeness and attachment formats;
+- conduct a local adaptive chat that asks only for missing minimum case fields;
+- show Cloudflare and origin evidence-collection guidance with each question;
+- increase requirements automatically for P1 critical incidents;
 - warn about possible secrets and unsupported P1 priority;
-- save drafts locally on the customer's device; and
-- generate a concise case ready to copy into Cloudflare Support;
+- store chat, answers, and drafts only in the customer's browser;
+- generate the copy-ready Support case locally without sending answers to the
+  server;
 - translate generated drafts into English, Vietnamese, or Khmer while
   preserving technical identifiers; and
 - switch the full website interface from the persistent language menu, with
@@ -44,10 +45,12 @@ chat message or pass it as a tool argument.
 The Worker:
 
 - keeps no customer token, screenshot, draft, or log data in server-side storage;
+- does not receive normal chat answers or locally generated case drafts;
 - never returns the token in a tool response;
 - sends the token only to `api.cloudflare.com`;
 - sends screenshots only to the configured Workers AI binding for the requested
-  analysis;
+  analysis and sends draft content only when the customer explicitly requests
+  translation;
 - removes URL query strings from request logs by default;
 - does not request client IP or cookie fields;
 - limits Logpull responses to 100 records and 1 MB; and

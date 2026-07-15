@@ -1,47 +1,32 @@
-const STORAGE_KEY = "cf-support-case-helper-v1";
+const STORAGE_KEY = "cf-support-chat-v2";
 const UI_LANGUAGE_KEY = "cf-support-ui-language";
-const UI_TRANSLATION_VERSION = "v1";
+const UI_TRANSLATION_VERSION = "chat-v1";
 const MAX_SCREENSHOT_BYTES = 4 * 1024 * 1024;
 
 const elements = {
-  form: document.querySelector("#case-form"),
-  message: document.querySelector("#issue-message"),
+  messages: document.querySelector("#messages"),
+  quickReplies: document.querySelector("#quick-replies"),
+  composer: document.querySelector("#composer"),
+  input: document.querySelector("#chat-input"),
+  send: document.querySelector("#send-message"),
+  status: document.querySelector("#composer-status"),
   screenshot: document.querySelector("#screenshot"),
-  fileChip: document.querySelector("#file-chip"),
-  fileName: document.querySelector("#file-name"),
-  removeFile: document.querySelector("#remove-file"),
-  analyze: document.querySelector("#analyze"),
-  analyzeStatus: document.querySelector("#analyze-status"),
-  diagnosis: document.querySelector("#diagnosis"),
-  diagnosisTitle: document.querySelector("#diagnosis-title"),
-  diagnosisExplanation: document.querySelector("#diagnosis-explanation"),
-  confidence: document.querySelector("#confidence"),
-  nextChecks: document.querySelector("#next-checks"),
-  analysisEvidence: document.querySelector("#analysis-evidence"),
-  screenshotWrap: document.querySelector("#screenshot-summary-wrap"),
-  screenshotSummary: document.querySelector("#screenshot-summary"),
-  confirmExtraction: document.querySelector("#confirm-extraction"),
-  apiToken: document.querySelector("#api-token"),
-  connect: document.querySelector("#connect"),
-  connectStatus: document.querySelector("#connect-status"),
-  zonePicker: document.querySelector("#zone-picker"),
-  zoneSelect: document.querySelector("#zone-select"),
-  p1Alert: document.querySelector("#p1-alert"),
-  score: document.querySelector("#score"),
+  attachmentPreview: document.querySelector("#attachment-preview"),
+  attachmentName: document.querySelector("#attachment-name"),
+  removeAttachment: document.querySelector("#remove-attachment"),
+  clear: document.querySelector("#clear-chat"),
+  score: document.querySelector("#readiness-score"),
   progressRing: document.querySelector("#progress-ring"),
   progressBar: document.querySelector("#progress-bar"),
-  progressSummary: document.querySelector("#progress-summary"),
-  checklist: document.querySelector("#checklist"),
-  issueEvidence: document.querySelector("#issue-evidence"),
-  validation: document.querySelector("#validation-message"),
-  generate: document.querySelector("#generate-draft"),
-  draftWrap: document.querySelector("#draft-wrap"),
+  readinessCopy: document.querySelector("#readiness-copy"),
+  collectedList: document.querySelector("#collected-list"),
+  answerCount: document.querySelector("#answer-count"),
+  evidenceList: document.querySelector("#evidence-list"),
+  draftPanel: document.querySelector("#draft-panel"),
   draftOutput: document.querySelector("#draft-output"),
-  languageButtons: document.querySelectorAll(".language-button"),
-  copy: document.querySelector("#copy-draft"),
-  copyStatus: document.querySelector("#copy-status"),
-  clear: document.querySelector("#clear-data"),
-  saveState: document.querySelector("#save-state"),
+  draftStatus: document.querySelector("#draft-status"),
+  draftLanguageButtons: document.querySelectorAll("[data-draft-language]"),
+  copyDraft: document.querySelector("#copy-draft"),
   languageMenu: document.querySelector("#language-menu"),
   languageMenuToggle: document.querySelector("#language-menu-toggle"),
   languageMenuPopover: document.querySelector("#language-menu-popover"),
@@ -49,407 +34,862 @@ const elements = {
   uiLanguageButtons: document.querySelectorAll("[data-ui-language]"),
 };
 
+const issueTypes = {
+  outage: "Outage or availability",
+  performance: "Performance",
+  dns: "DNS",
+  ssl: "SSL / TLS",
+  security: "Security or WAF",
+  workers: "Workers",
+  "zero-trust": "Cloudflare One / Zero Trust",
+  other: "Other",
+};
+
+const questions = {
+  issueType: {
+    prompt: "Which Cloudflare area is affected?",
+    guidance:
+      "Choose the closest product area. This changes the evidence checklist. If you are unsure, choose Other.",
+    options: Object.entries(issueTypes).map(([value, label]) => ({ value, label })),
+  },
+  priority: {
+    prompt: "How severe is the business impact?",
+    guidance:
+      "P1: severe outage or active attack. P2: significant but localized disruption. P3: moderate impact. P4: low impact or a general question.",
+    options: [
+      { value: "P1", label: "P1 · Critical" },
+      { value: "P2", label: "P2 · High" },
+      { value: "P3", label: "P3 · Normal" },
+      { value: "P4", label: "P4 · Low" },
+    ],
+  },
+  service: {
+    prompt: "Which Cloudflare service is affected?",
+    guidance:
+      "Use the product name shown in the Dashboard, for example CDN, DNS, WAF, Workers, Access, Gateway, or Magic Transit.",
+    placeholder: "Example: CDN and WAF",
+  },
+  hostnames: {
+    prompt: "What zone or hostname is affected?",
+    guidance:
+      "Provide the public hostname users request, such as api.example.com. You can find the zone in the Cloudflare Dashboard account overview.",
+    placeholder: "Example: api.example.com",
+  },
+  startedUtc: {
+    prompt: "When did the issue start?",
+    guidance:
+      "Use UTC so Cloudflare and origin logs can be correlated. Copy the timestamp from the error page, HAR, monitoring alert, or origin log.",
+    placeholder: "Example: 2026-07-15T03:32:00Z",
+    validate(value) {
+      return /(?:Z|\bUTC\b)/i.test(value) && !Number.isNaN(Date.parse(value.replace(/\s+UTC$/i, "Z")))
+        ? ""
+        : "Please provide a valid UTC timestamp ending in Z or UTC.";
+    },
+  },
+  frequency: {
+    prompt: "How often does the problem happen?",
+    guidance:
+      "State whether every request fails, it is intermittent, it affects a percentage of traffic, or it happened once.",
+    placeholder: "Example: Every request for the last 20 minutes",
+  },
+  impact: {
+    prompt: "What is the production and business impact?",
+    guidance:
+      "Describe what users cannot do and the business effect. Include availability, revenue, security, or operational impact rather than only saying “it is broken.”",
+    placeholder: "Example: Checkout is unavailable for all customers",
+  },
+  affectedUsers: {
+    prompt: "Which users, regions, or networks are affected?",
+    guidance:
+      "For P1, state whether all users are affected. Otherwise list affected countries, ISPs, offices, applications, or approximate user percentage.",
+    placeholder: "Example: All users in APAC across multiple ISPs",
+  },
+  expected: {
+    prompt: "What did you expect to happen?",
+    guidance:
+      "Describe the successful behavior in one or two sentences. This gives Support a clear comparison point.",
+    placeholder: "Example: The API should return HTTP 200 within two seconds",
+  },
+  actual: {
+    prompt: "What actually happens?",
+    guidance:
+      "Include the visible symptom and status code. Avoid conclusions unless evidence proves the cause.",
+    placeholder: "Example: Requests return Cloudflare Error 522",
+  },
+  reproduction: {
+    prompt: "How can Cloudflare reproduce the issue?",
+    guidance:
+      "List the shortest repeatable steps, including an example URL, request method, required conditions, and the observed result. Remove credentials and private query values.",
+    placeholder: "Example: 1. Open… 2. Submit… 3. Observe…",
+  },
+  evidence: {
+    prompt: "Paste an exact error, Ray ID, or evidence summary.",
+    guidance:
+      "A Ray ID appears at the bottom of most Cloudflare error pages. Include its matching UTC timestamp. You can also name prepared HAR, screenshot, origin log, curl, dig, or MTR files.",
+    placeholder: "Example: Error 522 · Ray ID 49ddb3e70e665831 · screenshot.png",
+  },
+  originFindings: {
+    prompt: "What did you find at the origin?",
+    guidance:
+      "For P1, record the investigation status even if no logs are available. Check web-server, application, firewall, load balancer, database, and deployment logs at the same UTC time.",
+    placeholder: "Example: Origin healthy; no request reached nginx at the failed UTC time",
+  },
+};
+
+const coreQuestionOrder = [
+  "issueType",
+  "priority",
+  "hostnames",
+  "startedUtc",
+  "frequency",
+  "impact",
+  "expected",
+  "actual",
+  "reproduction",
+  "evidence",
+];
+
+const fieldLabels = {
+  issueType: "Issue",
+  priority: "Priority",
+  service: "Service",
+  hostnames: "Hostname",
+  startedUtc: "Started",
+  frequency: "Frequency",
+  impact: "Impact",
+  affectedUsers: "Affected",
+  expected: "Expected",
+  actual: "Actual",
+  reproduction: "Reproduce",
+  exactErrors: "Error",
+  rayIds: "Ray ID",
+  originFindings: "Origin",
+};
+
+const evidenceByIssue = {
+  outage: ["Origin web-server logs", "curl and MTR output", "Origin health"],
+  performance: ["HAR file", "curl timing output", "Origin and database timing"],
+  dns: ["dig or nslookup output", "Authoritative nameservers", "DNS record values"],
+  ssl: ["openssl output", "Certificate chain", "Cloudflare SSL/TLS mode"],
+  security: ["Security Event and rule ID", "Ray ID", "Expected rule behavior"],
+  workers: ["Worker name and version", "Workers exception logs", "Deployment timestamp"],
+  "zero-trust": ["Product and policy name", "WARP diagnostics", "User and application impact"],
+  other: ["Relevant origin logs", "Network diagnostics", "Recent changes"],
+};
+
+const localErrorRules = {
+  520: ["Unknown response from origin (520)", "origin", "Cloudflare received an empty, unknown, or unexpected origin response.", ["Check origin application logs at the same UTC time.", "Test the origin directly with the affected Host header."]],
+  521: ["Origin refused connection (521)", "origin", "The origin refused Cloudflare's connection.", ["Confirm the origin service is listening.", "Allow Cloudflare IP ranges through origin firewalls."]],
+  522: ["Origin connection timed out (522)", "origin", "Cloudflare did not complete the connection to the origin in time.", ["Check origin load, firewall drops, and connection limits.", "Collect origin logs and MTR for the failed UTC window."]],
+  523: ["Origin is unreachable (523)", "network", "Cloudflare could not route to the configured origin.", ["Confirm the DNS record contains the current origin IP.", "Check routing with the hosting provider."]],
+  524: ["Origin response timed out (524)", "application", "Cloudflare connected, but the origin application did not respond before the timeout.", ["Find slow requests in application and database logs.", "Measure direct-origin response time."]],
+  525: ["Origin TLS handshake failed (525)", "origin", "TLS negotiation between Cloudflare and the origin failed.", ["Validate origin ciphers, SNI, and certificate configuration.", "Test the origin with openssl."]],
+  526: ["Invalid origin certificate (526)", "origin", "Cloudflare could not validate the origin certificate in Full (strict) mode.", ["Confirm certificate validity and hostname coverage.", "Serve the complete certificate chain."]],
+  1016: ["Origin DNS error (1016)", "network", "Cloudflare could not resolve the configured origin hostname.", ["Run dig against authoritative nameservers.", "Review CNAME targets and recent DNS changes."]],
+  1020: ["Request blocked by a Cloudflare rule (1020)", "cloudflare", "A Cloudflare security rule denied the request.", ["Search Security Events using the Ray ID and UTC timestamp.", "Review the matched rule before changing it."]],
+  1101: ["Worker threw an exception (1101)", "application", "A Cloudflare Worker terminated because of an exception.", ["Inspect Workers logs at the same UTC time.", "Review the latest Worker deployment and stack trace."]],
+  1102: ["Worker exceeded a resource limit (1102)", "application", "A Cloudflare Worker exceeded a runtime limit.", ["Inspect Workers CPU time and invocation logs.", "Check loops, parsing, and subrequest volume."]],
+};
+
 let screenshotDataUrl;
-let pendingScreenshotAnalysis;
-let sourceDraft;
+let state = loadState() ?? createInitialState();
+let sourceDraft = state.draft || "";
 let saveTimer;
-const uiTranslationEntries = captureUiTranslationEntries();
-const uiSourceStrings = uiTranslationEntries.map((entry) => entry.original);
-const uiSourceHash = hashStrings(uiSourceStrings);
 
-const requiredFields = [
-  ["priority", "Priority"],
-  ["zoneOrHost", "Affected zone or hostname"],
-  ["startedUtc", "Start timestamp in UTC"],
-  ["impact", "Business impact"],
-  ["frequency", "Problem frequency"],
-  ["expected", "Expected result"],
-  ["actual", "Actual result"],
-  ["reproduction", "Steps to reproduce"],
-  ["evidence", "Error, Ray ID, or attachment"],
-];
-const criticalRequiredFields = [
-  ["service", "Affected Cloudflare service (P1)"],
-  ["hostname", "Affected hostname (P1)"],
-  ["affectedUsers", "Affected users or regions (P1)"],
-  ["exactOrRay", "Exact error or Ray ID (P1)"],
-  ["originStatus", "Origin investigation status (P1)"],
-];
+initializeConversation();
 
-restoreDraft();
-updateEvidence();
-updateProgress();
-initializeUiLanguage();
-
-elements.languageMenuToggle.addEventListener("click", () => {
-  const willOpen = elements.languageMenuPopover.hidden;
-  elements.languageMenuPopover.hidden = !willOpen;
-  elements.languageMenuToggle.setAttribute("aria-expanded", String(willOpen));
-});
-
-for (const button of elements.uiLanguageButtons) {
-  button.addEventListener("click", async () => {
-    elements.languageMenuPopover.hidden = true;
-    elements.languageMenuToggle.setAttribute("aria-expanded", "false");
-    await setUiLanguage(button.dataset.uiLanguage);
-  });
-}
-
-document.addEventListener("click", (event) => {
-  if (!elements.languageMenu.contains(event.target)) {
-    elements.languageMenuPopover.hidden = true;
-    elements.languageMenuToggle.setAttribute("aria-expanded", "false");
+elements.composer.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const text = elements.input.value.trim();
+  if (!text && !screenshotDataUrl) return;
+  elements.input.value = "";
+  resizeComposer();
+  if (state.phase === "initial") {
+    await handleInitialIssue(text);
+  } else if (state.currentQuestion) {
+    handleQuestionAnswer(text, text);
   }
 });
 
-elements.message.addEventListener("input", scheduleSave);
-elements.form.addEventListener("input", () => {
-  scheduleSave();
-  updateProgress();
+elements.input.addEventListener("input", resizeComposer);
+elements.input.addEventListener("keydown", (event) => {
+  if (event.key === "Enter" && !event.shiftKey) {
+    event.preventDefault();
+    elements.composer.requestSubmit();
+  }
 });
-elements.form.elements.priority.addEventListener("change", updateCriticalState);
-elements.form.elements.issueType.addEventListener("change", updateEvidence);
 
 elements.screenshot.addEventListener("change", async () => {
   const file = elements.screenshot.files?.[0];
   if (!file) return;
   if (file.size > MAX_SCREENSHOT_BYTES) {
-    setStatus(elements.analyzeStatus, "Screenshot must be 4 MB or smaller.", true);
+    setStatus("Screenshot must be 4 MB or smaller.", true);
     removeScreenshot();
     return;
   }
   if (!["image/png", "image/jpeg", "image/gif", "image/webp"].includes(file.type)) {
-    setStatus(elements.analyzeStatus, "Use a PNG, JPG, GIF, or WebP image.", true);
+    setStatus("Use a PNG, JPG, GIF, or WebP screenshot.", true);
     removeScreenshot();
     return;
   }
   screenshotDataUrl = await readAsDataUrl(file);
-  elements.fileName.textContent = `${file.name} · ${formatBytes(file.size)}`;
-  elements.fileChip.hidden = false;
-  setStatus(elements.analyzeStatus, "Screenshot is used for this analysis only.");
+  elements.attachmentName.textContent = `${file.name} · ${formatBytes(file.size)}`;
+  elements.attachmentPreview.hidden = false;
+  setStatus("Screenshot will be used for this analysis only and will not be saved.");
 });
 
-elements.removeFile.addEventListener("click", removeScreenshot);
+elements.removeAttachment.addEventListener("click", removeScreenshot);
 
-elements.analyze.addEventListener("click", async () => {
-  if (!elements.message.value.trim() && !screenshotDataUrl) {
-    setStatus(elements.analyzeStatus, "Describe the issue or add a screenshot.", true);
-    elements.message.focus();
-    return;
-  }
-  setBusy(elements.analyze, true, "Analyzing…");
-  setStatus(elements.analyzeStatus, "Looking for error codes and request details…");
-  try {
-    const analysis = await api("/api/analyze", {
-      method: "POST",
-      body: JSON.stringify({
-        message: elements.message.value,
-        ...(screenshotDataUrl ? { imageDataUrl: screenshotDataUrl } : {}),
-      }),
-    });
-    renderAnalysis(analysis);
-    if (analysis.aiUsed) {
-      pendingScreenshotAnalysis = analysis;
-    } else {
-      applySignals(analysis);
-    }
-    const redactionMessage = analysis.redactions
-      ? ` ${analysis.redactions} possible secret value(s) were redacted.`
-      : "";
-    setStatus(elements.analyzeStatus, `Analysis complete.${redactionMessage}`);
-  } catch (error) {
-    setStatus(elements.analyzeStatus, error.message, true);
-  } finally {
-    setBusy(elements.analyze, false, "Analyze issue");
-  }
+elements.clear.addEventListener("click", () => {
+  if (!window.confirm("Start a new case and remove this local chat and draft?")) return;
+  localStorage.removeItem(STORAGE_KEY);
+  state = createInitialState();
+  sourceDraft = "";
+  removeScreenshot();
+  initializeConversation();
 });
 
-elements.confirmExtraction.addEventListener("change", () => {
-  if (elements.confirmExtraction.checked && pendingScreenshotAnalysis) {
-    applySignals(pendingScreenshotAnalysis);
-    pendingScreenshotAnalysis = undefined;
-    setStatus(elements.analyzeStatus, "Confirmed details added to your draft.");
-  }
+elements.copyDraft.addEventListener("click", async () => {
+  await navigator.clipboard.writeText(elements.draftOutput.value);
+  elements.draftStatus.textContent = "Case draft copied.";
 });
 
-elements.connect.addEventListener("click", async () => {
-  const token = elements.apiToken.value.trim();
-  if (!token) {
-    setStatus(elements.connectStatus, "Enter a read-only API token.", true);
-    return;
-  }
-  setBusy(elements.connect, true, "Connecting…");
-  setStatus(elements.connectStatus, "Verifying token…");
-  try {
-    await api("/api/cloudflare/connection", {
-      headers: { "X-Cloudflare-API-Token": token },
-    });
-    const { zones } = await api("/api/cloudflare/zones", {
-      headers: { "X-Cloudflare-API-Token": token },
-    });
-    renderZones(Array.isArray(zones) ? zones : []);
-    setStatus(
-      elements.connectStatus,
-      `Connected. ${Array.isArray(zones) ? zones.length : 0} zone(s) available.`,
-    );
-  } catch (error) {
-    setStatus(elements.connectStatus, error.message, true);
-  } finally {
-    setBusy(elements.connect, false, "Connect");
-  }
-});
-
-elements.zoneSelect.addEventListener("change", () => {
-  const option = elements.zoneSelect.selectedOptions[0];
-  if (!option?.value) return;
-  elements.form.elements.zoneId.value = option.value;
-  elements.form.elements.zoneName.value = option.dataset.name ?? "";
-  scheduleSave();
-  updateProgress();
-});
-
-elements.generate.addEventListener("click", async () => {
-  setBusy(elements.generate, true, "Checking…");
-  try {
-    const result = await api("/api/case/draft", {
-      method: "POST",
-      body: JSON.stringify(caseData()),
-    });
-    renderValidation(result.validation);
-    sourceDraft = result.body;
-    elements.draftOutput.value = result.body;
-    setActiveLanguage();
-    elements.draftWrap.hidden = false;
-    elements.draftOutput.focus();
-  } catch (error) {
-    elements.validation.textContent = error.message;
-    elements.validation.className = "validation-message warning";
-  } finally {
-    setBusy(elements.generate, false, "Generate case draft");
-  }
-});
-
-for (const button of elements.languageButtons) {
+for (const button of elements.draftLanguageButtons) {
   button.addEventListener("click", async () => {
     if (!sourceDraft) return;
-    setLanguageButtonsBusy(true);
-    setStatus(elements.copyStatus, `Translating to ${button.textContent.trim()}…`);
+    setDraftButtonsBusy(true);
+    elements.draftStatus.textContent = `Translating to ${button.textContent.trim()}…`;
     try {
       const result = await api("/api/translate", {
         method: "POST",
         body: JSON.stringify({
           text: sourceDraft,
-          targetLanguage: button.dataset.language,
+          targetLanguage: button.dataset.draftLanguage,
         }),
       });
       elements.draftOutput.value = result.translation;
-      setActiveLanguage(button.dataset.language);
-      setStatus(
-        elements.copyStatus,
-        `Draft translated to ${button.textContent.trim()}. Review technical details before submission.`,
-      );
+      setActiveDraftLanguage(button.dataset.draftLanguage);
+      elements.draftStatus.textContent =
+        "Translation complete. Review technical values before submission.";
     } catch (error) {
-      setStatus(elements.copyStatus, error.message, true);
+      elements.draftStatus.textContent = error.message;
     } finally {
-      setLanguageButtonsBusy(false);
+      setDraftButtonsBusy(false);
     }
   });
 }
 
-elements.copy.addEventListener("click", async () => {
-  await navigator.clipboard.writeText(elements.draftOutput.value);
-  setStatus(elements.copyStatus, "Draft copied.");
-});
+function createInitialState() {
+  return {
+    phase: "initial",
+    messages: [],
+    caseData: { issueType: "" },
+    evidence: [],
+    currentQuestion: "",
+    pendingAnalysis: null,
+    draft: "",
+  };
+}
 
-elements.clear.addEventListener("click", () => {
-  if (!window.confirm("Clear the issue, evidence, token, and saved draft from this browser?")) {
+function initializeConversation() {
+  if (state.messages.length === 0) {
+    addMessage(
+      "assistant",
+      "Hi — describe the Cloudflare error or issue you are seeing. You can paste the message, URL, Ray ID, logs, or attach a screenshot.",
+      "Start with one failed request if possible. Include an affected hostname and UTC timestamp. I will ask only for information that is still missing.",
+    );
+  }
+  renderAll();
+  if (state.phase === "questions" && state.currentQuestion) {
+    showQuestionControls(state.currentQuestion);
+  }
+}
+
+async function handleInitialIssue(text) {
+  addMessage("user", text || "Attached an error screenshot.");
+  setBusy(true);
+  setStatus("Analyzing the error and extracting troubleshooting signals…");
+  try {
+    const analysis = screenshotDataUrl
+      ? await api("/api/analyze", {
+          method: "POST",
+          body: JSON.stringify({
+            message: text,
+            imageDataUrl: screenshotDataUrl,
+          }),
+        })
+      : analyzeLocally(text);
+    state.evidence = analysis.requiredEvidence ?? [];
+    inferCaseData(
+      text,
+      analysis.aiUsed ? { ...analysis, likelyIssue: "", signals: {} } : analysis,
+    );
+    addMessage(
+      "assistant",
+      `Likely issue: ${analysis.likelyIssue}\nConfidence: ${analysis.confidence}\n\n${analysis.explanation}`,
+      `Next checks:\n${(analysis.nextChecks ?? []).map((item, index) => `${index + 1}. ${item}`).join("\n")}`,
+      "diagnosis",
+    );
+    if (analysis.aiUsed) {
+      state.pendingAnalysis = analysis;
+      addMessage(
+        "assistant",
+        `I extracted these screenshot details:\n${analysis.screenshotSummary || "No additional visible details."}\n\nAre these details correct?`,
+        "Confirm extracted values before they are used in your case.",
+      );
+      state.currentQuestion = "confirmScreenshot";
+      state.phase = "questions";
+      saveState();
+      renderAll();
+      showQuickReplies([
+        { value: "yes", label: "Yes, use them" },
+        { value: "no", label: "No, ignore them" },
+      ]);
+    } else {
+      beginQuestions();
+    }
+  } catch (error) {
+    addMessage(
+      "assistant",
+      `I could not analyze that input: ${error.message}\n\nYou can continue by describing the exact error in text.`,
+    );
+  } finally {
+    removeScreenshot();
+    setBusy(false);
+    setStatus("");
+  }
+}
+
+function beginQuestions() {
+  state.phase = "questions";
+  state.pendingAnalysis = null;
+  askNextQuestion();
+}
+
+function askNextQuestion() {
+  const questionId = findNextQuestion();
+  if (!questionId) {
+    completeCase();
     return;
   }
-  localStorage.removeItem(STORAGE_KEY);
-  elements.form.reset();
-  elements.message.value = "";
-  elements.apiToken.value = "";
-  elements.diagnosis.hidden = true;
-  elements.draftWrap.hidden = true;
-  sourceDraft = undefined;
-  elements.zonePicker.hidden = true;
-  updateCriticalState();
-  removeScreenshot();
-  updateEvidence();
-  updateProgress();
-  setStatus(elements.saveState, "All local data cleared.");
-});
-
-function renderAnalysis(analysis) {
-  elements.diagnosisTitle.textContent = analysis.likelyIssue;
-  elements.diagnosisExplanation.textContent = analysis.explanation;
-  elements.confidence.textContent = `${analysis.confidence} confidence`;
-  fillList(elements.nextChecks, analysis.nextChecks);
-  fillList(elements.analysisEvidence, analysis.requiredEvidence);
-  elements.screenshotWrap.hidden = !analysis.screenshotSummary;
-  elements.screenshotSummary.textContent = analysis.screenshotSummary ?? "";
-  elements.confirmExtraction.checked = false;
-  elements.diagnosis.hidden = false;
+  state.currentQuestion = questionId;
+  const question = questions[questionId];
+  addMessage("assistant", question.prompt, question.guidance);
+  saveState();
+  renderAll();
+  showQuestionControls(questionId);
 }
 
-function applySignals(analysis) {
-  const { signals } = analysis;
-  setIfEmpty("hostnames", signals.hostnames.join(", "));
-  setIfEmpty("rayIds", signals.rayIds.join(", "));
-  setIfEmpty("exactErrors", signals.errorCodes.map((code) => `Cloudflare Error ${code}`).join("\n"));
-  if (signals.timestampsUtc[0] && !elements.form.elements.startedUtc.value) {
-    elements.form.elements.startedUtc.value = signals.timestampsUtc[0]
-      .replace("Z", "")
-      .slice(0, 16);
+function findNextQuestion() {
+  const data = state.caseData;
+  const order = [...coreQuestionOrder];
+  if (data.priority === "P1") {
+    order.splice(2, 0, "service");
+    order.splice(7, 0, "affectedUsers");
+    order.push("originFindings");
   }
-  setIfEmpty("actual", analysis.likelyIssue);
-  scheduleSave();
-  updateProgress();
+  return order.find((field) => !isFieldComplete(field)) ?? "";
 }
 
-function setIfEmpty(name, value) {
-  if (value && !elements.form.elements[name].value) {
-    elements.form.elements[name].value = value;
+function isFieldComplete(field) {
+  const data = state.caseData;
+  if (field === "evidence") return Boolean(data.exactErrors || data.rayIds);
+  return Boolean(data[field]?.trim?.() ?? data[field]);
+}
+
+function showQuestionControls(questionId) {
+  if (questionId === "confirmScreenshot") {
+    showQuickReplies([
+      { value: "yes", label: "Yes, use them" },
+      { value: "no", label: "No, ignore them" },
+    ]);
+    return;
   }
+  const question = questions[questionId];
+  elements.input.placeholder =
+    question.placeholder ?? "Type your answer…";
+  if (question.options) showQuickReplies(question.options);
+  else hideQuickReplies();
+  elements.input.focus();
 }
 
-async function updateEvidence() {
-  try {
-    const issueType = elements.form.elements.issueType.value || "other";
-    const result = await api(`/api/evidence?issue_type=${encodeURIComponent(issueType)}`);
-    fillList(elements.issueEvidence, result.evidence);
-  } catch {
-    fillList(elements.issueEvidence, ["Collect relevant Cloudflare and origin evidence."]);
+function showQuickReplies(options) {
+  elements.quickReplies.replaceChildren(
+    ...options.map((option) => {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.textContent = option.label;
+      button.addEventListener("click", () =>
+        handleQuestionAnswer(option.value, option.label),
+      );
+      return button;
+    }),
+  );
+  elements.quickReplies.hidden = false;
+}
+
+function hideQuickReplies() {
+  elements.quickReplies.hidden = true;
+  elements.quickReplies.replaceChildren();
+}
+
+function handleQuestionAnswer(value, displayValue) {
+  if (!value) return;
+  if (state.currentQuestion === "confirmScreenshot") {
+    addMessage("user", displayValue);
+    if (value === "yes" && state.pendingAnalysis) {
+      inferCaseData("", state.pendingAnalysis);
+    }
+    state.pendingAnalysis = null;
+    state.currentQuestion = "";
+    beginQuestions();
+    return;
   }
+
+  const questionId = state.currentQuestion;
+  const question = questions[questionId];
+  if (question.options) {
+    const normalized = value.trim().toLowerCase();
+    const match = question.options.find(
+      (option) =>
+        option.value.toLowerCase() === normalized ||
+        option.label.toLowerCase() === normalized,
+    );
+    if (!match) {
+      setStatus("Please choose one of the available options.", true);
+      return;
+    }
+    value = match.value;
+    displayValue = match.label;
+  }
+  const validationError = question.validate?.(value) ?? "";
+  if (validationError) {
+    setStatus(validationError, true);
+    return;
+  }
+
+  addMessage("user", displayValue);
+  if (questionId === "evidence") {
+    state.caseData.exactErrors = value;
+    const rayIds = [
+      ...value.matchAll(/\b([a-f0-9]{16,32})(?:-[A-Z]{3})?\b/gi),
+    ].map((match) => match[1]);
+    if (rayIds.length) state.caseData.rayIds = [...new Set(rayIds)].join(", ");
+  } else {
+    state.caseData[questionId] = value;
+  }
+
+  if (questionId === "priority" && value === "P1") {
+    addMessage(
+      "assistant",
+      "P1 selected. Check the Cloudflare Status page first. Enterprise customers with an active severe outage or attack should also use the Emergency hotline tile in the Dashboard.",
+      "P1 requires ongoing customer availability plus the affected service, hostname, users, exact error or Ray ID, and origin investigation status.",
+      "critical",
+    );
+  }
+  state.currentQuestion = "";
+  setStatus("");
+  saveState();
+  renderAll();
+  askNextQuestion();
 }
 
-function updateProgress() {
-  const data = caseData();
-  const complete = {
-    priority: Boolean(data.priority),
-    zoneOrHost: Boolean(data.zoneName || data.hostnames),
-    startedUtc: Boolean(data.startedUtc),
-    impact: Boolean(data.impact),
-    frequency: Boolean(data.frequency),
-    expected: Boolean(data.expected),
-    actual: Boolean(data.actual),
-    reproduction: Boolean(data.reproduction),
-    evidence: Boolean(data.exactErrors || data.rayIds || data.attachments),
-    service: Boolean(data.service),
-    hostname: Boolean(data.hostnames),
-    affectedUsers: Boolean(data.affectedUsers),
-    exactOrRay: Boolean(data.exactErrors || data.rayIds),
-    originStatus: Boolean(data.originFindings),
+function analyzeLocally(text) {
+  const errorCodes = [
+    ...new Set(
+      [
+        ...text.matchAll(
+          /(?:error(?:\s+code)?[\s:#-]*|cloudflare\s+)(\d{3,4})\b/gi,
+        ),
+        ...text.matchAll(/\b(52[0-6]|1016|1020|110[12])\b/g),
+      ].map((match) => match[1]).filter(Boolean),
+    ),
+  ];
+  const rayIds = [
+    ...new Set(
+      [...text.matchAll(/(?:ray(?:\s+id)?[\s:#-]*)([a-f0-9]{16,32})(?:-[A-Z]{3})?/gi)]
+        .map((match) => match[1])
+        .filter(Boolean),
+    ),
+  ];
+  const hostnames = [
+    ...new Set(
+      [...text.matchAll(/\b(?:https?:\/\/)?([a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z]{2,})+)\b/gi)]
+        .map((match) => match[1])
+        .filter((value) => value && !value.endsWith("cloudflare.com")),
+    ),
+  ];
+  const timestampsUtc = [
+    ...new Set(
+      [...text.matchAll(/\b\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2})?Z\b/g)].map(
+        (match) => match[0],
+      ),
+    ),
+  ];
+  const rule = errorCodes.map((code) => localErrorRules[code]).find(Boolean);
+  let likelyIssue = "Issue needs more evidence";
+  let likelyArea = "unknown";
+  let explanation =
+    "No known Cloudflare error code was found. I will collect the minimum details needed to investigate.";
+  let nextChecks = [
+    "Capture one exact error, affected URL, Ray ID, and UTC timestamp.",
+    "Compare the failed request with origin logs.",
+  ];
+  if (rule) {
+    [likelyIssue, likelyArea, explanation, nextChecks] = rule;
+  } else if (/certificate|ssl|tls/i.test(text)) {
+    likelyIssue = "SSL/TLS issue";
+    likelyArea = "origin";
+    explanation =
+      "The description suggests a certificate or TLS negotiation problem.";
+    nextChecks = [
+      "Capture the exact browser or TLS error.",
+      "Test the edge and origin certificates with openssl.",
+    ];
+  } else if (/dns|nxdomain|resolve/i.test(text)) {
+    likelyIssue = "DNS resolution issue";
+    likelyArea = "network";
+    explanation =
+      "The description suggests that a hostname or origin cannot be resolved.";
+    nextChecks = [
+      "Run dig against authoritative nameservers.",
+      "Compare public resolver answers and recent DNS changes.",
+    ];
+  } else if (/slow|latency|timeout/i.test(text)) {
+    likelyIssue = "Performance or timeout issue";
+    explanation =
+      "The description suggests latency or timeout symptoms, but more evidence is needed to locate the delay.";
+    nextChecks = [
+      "Record response timing with curl.",
+      "Compare proxied and direct-origin performance.",
+    ];
+  }
+  return {
+    likelyIssue,
+    likelyArea,
+    confidence: rule ? "high" : text.length > 40 ? "medium" : "low",
+    explanation,
+    signals: { errorCodes, rayIds, hostnames, timestampsUtc },
+    nextChecks,
+    requiredEvidence: [
+      "Affected hostname and Zone ID",
+      "One failed request timestamp in UTC",
+      "Exact error and Ray ID",
+      "Origin logs for the same UTC window",
+    ],
+    needsConfirmation: false,
+    aiUsed: false,
+    redactions: 0,
   };
-  const fields =
-    data.priority === "P1"
-      ? [...requiredFields, ...criticalRequiredFields]
-      : requiredFields;
-  const done = fields.filter(([key]) => complete[key]).length;
-  const score = Math.round((done / fields.length) * 100);
+}
+
+function inferCaseData(text, analysis) {
+  const data = state.caseData;
+  applyAnalysisSignals(analysis);
+  const lower = `${text} ${analysis.likelyIssue}`.toLowerCase();
+  if (!data.issueType) {
+    data.issueType =
+      lower.includes("worker") || lower.includes("1101") || lower.includes("1102")
+        ? "workers"
+        : lower.includes("ssl") || lower.includes("tls") || lower.includes("certificate")
+          ? "ssl"
+          : lower.includes("dns") || lower.includes("1016")
+            ? "dns"
+            : lower.includes("waf") || lower.includes("blocked") || lower.includes("1020")
+              ? "security"
+              : lower.includes("slow") || lower.includes("latency")
+                ? "performance"
+                : /52[0-6]|outage|unavailable|timeout/.test(lower)
+                  ? "outage"
+                  : "";
+  }
+  if (!data.service && data.issueType) data.service = issueTypes[data.issueType];
+}
+
+function applyAnalysisSignals(analysis) {
+  const signals = analysis.signals ?? {};
+  if (!state.caseData.hostnames && signals.hostnames?.length) {
+    state.caseData.hostnames = signals.hostnames.join(", ");
+  }
+  if (!state.caseData.startedUtc && signals.timestampsUtc?.length) {
+    state.caseData.startedUtc = signals.timestampsUtc[0];
+  }
+  if (!state.caseData.rayIds && signals.rayIds?.length) {
+    state.caseData.rayIds = signals.rayIds.join(", ");
+  }
+  if (!state.caseData.exactErrors && signals.errorCodes?.length) {
+    state.caseData.exactErrors = signals.errorCodes
+      .map((code) => `Cloudflare Error ${code}`)
+      .join(", ");
+  }
+  if (!state.caseData.actual && analysis.likelyIssue) {
+    state.caseData.actual = analysis.likelyIssue;
+  }
+}
+
+function completeCase() {
+  state.phase = "complete";
+  state.currentQuestion = "";
+  sourceDraft = generateCaseDraft(state.caseData);
+  state.draft = sourceDraft;
+  addMessage(
+    "assistant",
+    "The minimum information is complete. I generated a Support case draft in the case panel.",
+    "Review every technical value, attach the listed evidence, and remove any secrets before submission. Cloudflare Support officially handles cases in English.",
+  );
+  saveState();
+  renderAll();
+}
+
+function generateCaseDraft(data) {
+  const safe = Object.fromEntries(
+    Object.entries(data).map(([key, value]) => [
+      key,
+      typeof value === "string" ? redactLocalSecrets(value) : value,
+    ]),
+  );
+  const title = `${safe.priority || "[Priority]"} ${safe.service || issueTypes[safe.issueType] || "Cloudflare"} – ${firstLine(safe.actual) || "Issue requiring investigation"}`;
+  return `Title: ${title}
+
+Account / zone
+- Zone name or affected hostname: ${safe.hostnames || ""}
+- Zone ID: ${safe.zoneId || ""}
+
+Impact
+- Priority: ${safe.priority || ""}
+- Production impact: ${safe.impact || ""}
+- Affected users/regions: ${safe.affectedUsers || ""}
+- Started (UTC): ${safe.startedUtc || ""}
+- Frequency: ${safe.frequency || ""}
+
+Issue
+- Expected behavior: ${safe.expected || ""}
+- Actual behavior: ${safe.actual || ""}
+- Exact error(s): ${safe.exactErrors || ""}
+- Steps to reproduce: ${safe.reproduction || ""}
+
+Investigation
+- Cloudflare Ray ID(s): ${safe.rayIds || ""}
+- Origin/log findings: ${safe.originFindings || "Not yet provided"}
+
+Evidence to attach
+${state.evidence.map((item) => `- ${item}`).join("\n")}
+
+Case participants
+- CC: `;
+}
+
+function redactLocalSecrets(value) {
+  return value
+    .replace(/\bBearer\s+[A-Za-z0-9._~+/=-]{12,}/gi, "[REDACTED]")
+    .replace(
+      /\b(?:authorization|api[-_ ]?key|token|password|secret)\s*[:=]\s*\S+/gi,
+      "[REDACTED]",
+    )
+    .replace(
+      /-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----[\s\S]*?-----END (?:RSA |EC |OPENSSH )?PRIVATE KEY-----/g,
+      "[REDACTED]",
+    );
+}
+
+function addMessage(role, text, guidance = "", kind = "guidance") {
+  state.messages.push({
+    role,
+    text,
+    guidance,
+    kind,
+    timestamp: new Date().toISOString(),
+  });
+  saveState();
+}
+
+function renderAll() {
+  renderMessages();
+  renderProgress();
+  renderCollected();
+  renderEvidence();
+  renderDraft();
+}
+
+function renderMessages() {
+  elements.messages.replaceChildren(
+    ...state.messages.map((message) => {
+      const row = document.createElement("div");
+      row.className = `message-row ${message.role}`;
+      const avatar = document.createElement("div");
+      avatar.className = "message-avatar";
+      avatar.textContent = message.role === "assistant" ? "CF" : "You";
+      const content = document.createElement("div");
+      content.className = "message-content";
+      const bubble = document.createElement("div");
+      bubble.className = "bubble";
+      bubble.textContent = message.text;
+      content.append(bubble);
+      if (message.guidance) {
+        const guidance = document.createElement("div");
+        guidance.className =
+          message.kind === "diagnosis"
+            ? "diagnosis-card"
+            : message.kind === "critical"
+              ? "critical-card"
+              : "guidance-card";
+        const title = document.createElement("strong");
+        title.textContent =
+          message.kind === "diagnosis"
+            ? "Recommended checks"
+            : message.kind === "critical"
+              ? "Critical incident guidance"
+              : "How to collect this";
+        guidance.append(title, document.createTextNode(message.guidance));
+        content.append(guidance);
+      }
+      const time = document.createElement("span");
+      time.className = "message-time";
+      time.textContent = new Date(message.timestamp).toLocaleTimeString([], {
+        hour: "2-digit",
+        minute: "2-digit",
+      });
+      content.append(time);
+      row.append(avatar, content);
+      return row;
+    }),
+  );
+  requestAnimationFrame(() => {
+    elements.messages.scrollTop = elements.messages.scrollHeight;
+  });
+}
+
+function requiredFields() {
+  const base = [
+    ["priority", "Priority"],
+    ["hostnames", "Affected zone or hostname"],
+    ["startedUtc", "UTC start time"],
+    ["frequency", "Frequency"],
+    ["impact", "Business impact"],
+    ["expected", "Expected result"],
+    ["actual", "Actual result"],
+    ["reproduction", "Reproduction"],
+    ["evidence", "Error or Ray ID"],
+  ];
+  if (state.caseData.priority === "P1") {
+    base.push(
+      ["service", "Affected service"],
+      ["affectedUsers", "Affected users"],
+      ["originFindings", "Origin status"],
+    );
+  }
+  return base;
+}
+
+function renderProgress() {
+  const required = requiredFields();
+  const done = required.filter(([field]) => isFieldComplete(field)).length;
+  const score = Math.round((done / required.length) * 100);
   elements.score.textContent = String(score);
   elements.progressBar.style.width = `${score}%`;
   elements.progressRing.style.background = `conic-gradient(var(--orange) ${score}%, #ebe8e3 ${score}%)`;
-  elements.progressSummary.textContent =
+  elements.readinessCopy.textContent =
     score === 100
-      ? "Core case information is complete."
-      : `${fields.length - done} required item(s) remaining.`;
+      ? "Minimum case requirements complete."
+      : `${required.length - done} required answer(s) remaining.`;
+}
 
-  elements.checklist.replaceChildren(
-    ...fields.map(([key, label]) => {
-      const item = document.createElement("li");
-      item.textContent = label;
-      if (complete[key]) item.className = "done";
-      return item;
+function renderCollected() {
+  const values = Object.entries(state.caseData).filter(
+    ([key, value]) => value && fieldLabels[key],
+  );
+  elements.answerCount.textContent = `${values.length} item${values.length === 1 ? "" : "s"}`;
+  if (!values.length) {
+    const empty = document.createElement("div");
+    empty.className = "empty-state";
+    empty.textContent = "Answers will appear here as we chat.";
+    elements.collectedList.replaceChildren(empty);
+    return;
+  }
+  elements.collectedList.replaceChildren(
+    ...values.map(([key, value]) => {
+      const row = document.createElement("div");
+      const term = document.createElement("dt");
+      const description = document.createElement("dd");
+      term.textContent = fieldLabels[key];
+      description.textContent =
+        key === "issueType" ? issueTypes[value] ?? value : truncate(value, 86);
+      row.append(term, description);
+      return row;
     }),
   );
 }
 
-function caseData() {
-  const values = Object.fromEntries(new FormData(elements.form).entries());
-  const data = Object.fromEntries(
-    Object.entries(values)
-      .map(([key, value]) => [key, String(value).trim()])
-      .filter(([, value]) => value),
-  );
-  if (data.startedUtc) data.startedUtc = `${data.startedUtc}:00Z`;
-  return data;
-}
-
-function renderValidation(validation) {
-  const messages = [];
-  if (validation.missing.length) {
-    messages.push(`Missing: ${validation.missing.join(", ")}.`);
-  } else {
-    messages.push("Core case information is complete.");
-  }
-  if (validation.warnings.length) messages.push(...validation.warnings);
-  elements.validation.textContent = messages.join(" ");
-  elements.validation.className = `validation-message ${
-    validation.warnings.length ? "warning" : validation.ready ? "ready" : ""
-  }`;
-}
-
-function renderZones(zones) {
-  elements.zoneSelect.replaceChildren(new Option("Choose a zone", ""));
-  for (const zone of zones) {
-    if (!zone || typeof zone.id !== "string" || typeof zone.name !== "string") continue;
-    const option = new Option(zone.name, zone.id);
-    option.dataset.name = zone.name;
-    elements.zoneSelect.add(option);
-  }
-  elements.zonePicker.hidden = false;
-}
-
-function fillList(list, values) {
-  list.replaceChildren(
-    ...(values ?? []).map((value) => {
-      const item = document.createElement("li");
-      item.textContent = value;
-      return item;
+function renderEvidence() {
+  const issueType = state.caseData.issueType || "other";
+  const evidence = [
+    "Affected hostname and Zone ID",
+    "One failed request timestamp in UTC",
+    "Exact error and Ray ID",
+    "Expected versus actual behavior",
+    ...(evidenceByIssue[issueType] ?? evidenceByIssue.other),
+  ];
+  elements.evidenceList.replaceChildren(
+    ...[...new Set([...state.evidence, ...evidence])].map((item) => {
+      const row = document.createElement("li");
+      row.textContent = item;
+      return row;
     }),
   );
 }
 
-function scheduleSave() {
+function renderDraft() {
+  if (!state.draft) {
+    elements.draftPanel.hidden = true;
+    return;
+  }
+  sourceDraft = state.draft;
+  elements.draftOutput.value = state.draft;
+  elements.draftPanel.hidden = false;
+}
+
+function saveState() {
   clearTimeout(saveTimer);
-  setStatus(elements.saveState, "Saving…");
   saveTimer = setTimeout(() => {
-    const form = Object.fromEntries(new FormData(elements.form).entries());
-    localStorage.setItem(
-      STORAGE_KEY,
-      JSON.stringify({ message: elements.message.value, form }),
-    );
-    setStatus(elements.saveState, "Saved on this device");
-  }, 350);
+    const safeState = {
+      ...state,
+      pendingAnalysis: state.pendingAnalysis
+        ? { ...state.pendingAnalysis, screenshotSummary: undefined }
+        : null,
+    };
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(safeState));
+  }, 100);
 }
 
-function restoreDraft() {
+function loadState() {
   try {
     const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? "null");
-    if (!saved) return;
-    elements.message.value = saved.message ?? "";
-    for (const [name, value] of Object.entries(saved.form ?? {})) {
-      if (elements.form.elements[name]) elements.form.elements[name].value = value;
-    }
-    updateCriticalState();
+    return saved?.messages && saved?.caseData ? saved : null;
   } catch {
     localStorage.removeItem(STORAGE_KEY);
+    return null;
   }
+}
+
+function setBusy(busy) {
+  elements.send.disabled = busy;
+  elements.input.disabled = busy;
+}
+
+function setStatus(message, error = false) {
+  elements.status.textContent = message;
+  elements.status.style.color = error ? "var(--red)" : "";
+}
+
+function resizeComposer() {
+  elements.input.style.height = "auto";
+  elements.input.style.height = `${Math.min(elements.input.scrollHeight, 140)}px`;
 }
 
 function removeScreenshot() {
   screenshotDataUrl = undefined;
-  pendingScreenshotAnalysis = undefined;
   elements.screenshot.value = "";
-  elements.fileChip.hidden = true;
-  elements.confirmExtraction.checked = false;
-}
-
-function updateCriticalState() {
-  const isCritical = elements.form.elements.priority.value === "P1";
-  elements.p1Alert.hidden = !isCritical;
-  document.body.classList.toggle("is-critical", isCritical);
+  elements.attachmentPreview.hidden = true;
 }
 
 function readAsDataUrl(file) {
@@ -474,92 +914,63 @@ async function api(path, options = {}) {
   return result;
 }
 
-function setStatus(element, message, error = false) {
-  element.textContent = message;
-  element.style.color = error ? "var(--red)" : "";
+function firstLine(value = "") {
+  return value.split(/\r?\n/)[0].slice(0, 90);
 }
 
-function setBusy(button, busy, text) {
-  button.disabled = busy;
-  button.textContent = text;
+function truncate(value, length) {
+  const text = String(value);
+  return text.length > length ? `${text.slice(0, length - 1)}…` : text;
 }
 
-function setLanguageButtonsBusy(busy) {
-  for (const button of elements.languageButtons) button.disabled = busy;
+function formatBytes(bytes) {
+  return bytes < 1024 * 1024
+    ? `${Math.ceil(bytes / 1024)} KB`
+    : `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-function setActiveLanguage(language) {
-  for (const button of elements.languageButtons) {
-    button.classList.toggle("active", button.dataset.language === language);
+function setDraftButtonsBusy(busy) {
+  for (const button of elements.draftLanguageButtons) button.disabled = busy;
+}
+
+function setActiveDraftLanguage(language) {
+  for (const button of elements.draftLanguageButtons) {
+    button.classList.toggle(
+      "active",
+      button.dataset.draftLanguage === language,
+    );
   }
 }
 
-function captureUiTranslationEntries() {
-  const entries = [];
-  const blocked = [
-    "script",
-    "style",
-    "textarea",
-    "input",
-    ".language-menu",
-    ".language-buttons",
-    ".action-status",
-    "#diagnosis",
-    "#checklist",
-    "#issue-evidence",
-    "#progress-summary",
-    "#validation-message",
-    "#draft-output",
-    "[data-no-translate]",
-  ].join(",");
-  const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, {
-    acceptNode(node) {
-      const value = node.nodeValue?.trim() ?? "";
-      const parent = node.parentElement;
-      if (
-        !value ||
-        !/[A-Za-z]/.test(value) ||
-        !parent ||
-        parent.closest(blocked)
-      ) {
-        return NodeFilter.FILTER_REJECT;
-      }
-      return NodeFilter.FILTER_ACCEPT;
-    },
+function initializeLanguageMenu() {
+  elements.languageMenuToggle.addEventListener("click", () => {
+    const open = elements.languageMenuPopover.hidden;
+    elements.languageMenuPopover.hidden = !open;
+    elements.languageMenuToggle.setAttribute("aria-expanded", String(open));
   });
-  let node;
-  while ((node = walker.nextNode())) {
-    const fullValue = node.nodeValue ?? "";
-    const original = fullValue.trim();
-    entries.push({
-      kind: "text",
-      node,
-      original,
-      leading: fullValue.match(/^\s*/)?.[0] ?? "",
-      trailing: fullValue.match(/\s*$/)?.[0] ?? "",
+  for (const button of elements.uiLanguageButtons) {
+    button.addEventListener("click", async () => {
+      elements.languageMenuPopover.hidden = true;
+      elements.languageMenuToggle.setAttribute("aria-expanded", "false");
+      await setUiLanguage(button.dataset.uiLanguage);
     });
   }
-  for (const element of document.querySelectorAll(
-    "input[placeholder], textarea[placeholder]",
-  )) {
-    const original = element.getAttribute("placeholder")?.trim();
-    if (original && /[A-Za-z]/.test(original)) {
-      entries.push({
-        kind: "attribute",
-        element,
-        attribute: "placeholder",
-        original,
-      });
+  document.addEventListener("click", (event) => {
+    if (!elements.languageMenu.contains(event.target)) {
+      elements.languageMenuPopover.hidden = true;
+      elements.languageMenuToggle.setAttribute("aria-expanded", "false");
     }
-  }
-  return entries;
+  });
+  initializeUiTranslation();
 }
 
-async function initializeUiLanguage() {
+const uiTranslationEntries = captureUiTranslationEntries();
+const uiSourceStrings = uiTranslationEntries.map((entry) => entry.original);
+const uiSourceHash = hashStrings(uiSourceStrings);
+
+async function initializeUiTranslation() {
   const preferred = localStorage.getItem(UI_LANGUAGE_KEY) ?? "en";
-  if (["en", "vi", "km"].includes(preferred)) {
-    await setUiLanguage(preferred);
-  }
+  if (["en", "vi", "km"].includes(preferred)) await setUiLanguage(preferred);
 }
 
 async function setUiLanguage(language) {
@@ -572,10 +983,8 @@ async function setUiLanguage(language) {
     let translations = uiSourceStrings;
     if (language !== "en") {
       const cacheKey = `${UI_TRANSLATION_VERSION}:${language}:${uiSourceHash}`;
-      const cached = readUiTranslationCache(cacheKey);
-      if (cached) {
-        translations = cached;
-      } else {
+      translations = readTranslationCache(cacheKey);
+      if (!translations) {
         const result = await api("/api/translate-ui", {
           method: "POST",
           body: JSON.stringify({
@@ -599,10 +1008,63 @@ async function setUiLanguage(language) {
     }
   } catch (error) {
     elements.currentLanguage.textContent = names.en;
-    setStatus(elements.saveState, `Translation unavailable: ${error.message}`, true);
+    setStatus(`Interface translation unavailable: ${error.message}`, true);
   } finally {
     setUiLanguageBusy(false);
   }
+}
+
+function captureUiTranslationEntries() {
+  const entries = [];
+  const blocked = [
+    "script",
+    "style",
+    "textarea",
+    "input",
+    ".language-menu",
+    ".messages",
+    ".collected-list",
+    ".evidence-panel",
+    ".draft-panel",
+    ".composer-status",
+    "[data-no-translate]",
+  ].join(",");
+  const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, {
+    acceptNode(node) {
+      const text = node.nodeValue?.trim() ?? "";
+      return text &&
+        /[A-Za-z]/.test(text) &&
+        node.parentElement &&
+        !node.parentElement.closest(blocked)
+        ? NodeFilter.FILTER_ACCEPT
+        : NodeFilter.FILTER_REJECT;
+    },
+  });
+  let node;
+  while ((node = walker.nextNode())) {
+    const full = node.nodeValue ?? "";
+    entries.push({
+      kind: "text",
+      node,
+      original: full.trim(),
+      leading: full.match(/^\s*/)?.[0] ?? "",
+      trailing: full.match(/\s*$/)?.[0] ?? "",
+    });
+  }
+  for (const element of document.querySelectorAll(
+    "input[placeholder], textarea[placeholder]",
+  )) {
+    const original = element.getAttribute("placeholder")?.trim();
+    if (original && /[A-Za-z]/.test(original)) {
+      entries.push({
+        kind: "attribute",
+        element,
+        attribute: "placeholder",
+        original,
+      });
+    }
+  }
+  return entries;
 }
 
 function applyUiTranslations(translations) {
@@ -610,26 +1072,26 @@ function applyUiTranslations(translations) {
     throw new Error("Cached translation does not match this page version");
   }
   uiTranslationEntries.forEach((entry, index) => {
-    const translation = translations[index];
-    if (typeof translation !== "string") return;
+    const translated = translations[index];
+    if (typeof translated !== "string") return;
     if (entry.kind === "text") {
-      entry.node.nodeValue = `${entry.leading}${translation}${entry.trailing}`;
+      entry.node.nodeValue = `${entry.leading}${translated}${entry.trailing}`;
     } else {
-      entry.element.setAttribute(entry.attribute, translation);
+      entry.element.setAttribute(entry.attribute, translated);
     }
   });
 }
 
-function readUiTranslationCache(cacheKey) {
+function readTranslationCache(key) {
   try {
-    const cached = JSON.parse(localStorage.getItem(cacheKey) ?? "null");
-    return Array.isArray(cached) &&
-      cached.length === uiTranslationEntries.length &&
-      cached.every((value) => typeof value === "string")
-      ? cached
+    const value = JSON.parse(localStorage.getItem(key) ?? "null");
+    return Array.isArray(value) &&
+      value.length === uiTranslationEntries.length &&
+      value.every((item) => typeof item === "string")
+      ? value
       : undefined;
   } catch {
-    localStorage.removeItem(cacheKey);
+    localStorage.removeItem(key);
     return undefined;
   }
 }
@@ -648,8 +1110,4 @@ function hashStrings(values) {
   return (hash >>> 0).toString(16);
 }
 
-function formatBytes(bytes) {
-  return bytes < 1024 * 1024
-    ? `${Math.ceil(bytes / 1024)} KB`
-    : `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-}
+initializeLanguageMenu();
