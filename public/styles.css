@@ -482,6 +482,27 @@ textarea:focus {
   border: 1px solid #f2c4bf;
 }
 
+.critical-mandatory {
+  display: block;
+  margin-top: 8px;
+  font-weight: 650;
+}
+
+.critical-note {
+  display: none;
+  width: fit-content;
+  padding: 2px 7px;
+  color: var(--red);
+  background: #fff0ee;
+  border-radius: 999px;
+  font-size: 0.68rem;
+  font-weight: 750;
+}
+
+body.is-critical .critical-note {
+  display: inline-block;
+}
+
 fieldset {
   margin: 0;
   padding: 25px 0;
@@ -534,6 +555,58 @@ legend {
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   font-size: 0.81rem;
   line-height: 1.55;
+}
+
+.translation-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-top: 20px;
+  padding: 13px 14px;
+  background: var(--soft);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+
+.translation-toolbar strong,
+.translation-toolbar span {
+  display: block;
+}
+
+.translation-toolbar span {
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 0.74rem;
+}
+
+.language-buttons {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.language-button {
+  min-height: 34px;
+  padding: 0 10px;
+  color: #4c4843;
+  background: #fff;
+  border: 1px solid #c8c3bc;
+  border-radius: 8px;
+  font-size: 0.76rem;
+  font-weight: 700;
+}
+
+.language-button:hover,
+.language-button.active {
+  color: #fff;
+  background: var(--orange-dark);
+  border-color: var(--orange-dark);
+}
+
+.language-button:disabled {
+  cursor: wait;
+  opacity: 0.6;
 }
 
 .progress-card {
@@ -702,6 +775,16 @@ footer p {
 
   .button:not(.button-small) {
     width: 100%;
+  }
+
+  .translation-toolbar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .language-buttons {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
   }
 
   footer {

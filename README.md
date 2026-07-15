@@ -13,7 +13,9 @@ The browser application can:
 - validate case completeness and attachment formats;
 - warn about possible secrets and unsupported P1 priority;
 - save drafts locally on the customer's device; and
-- generate a concise case ready to copy into Cloudflare Support.
+- generate a concise case ready to copy into Cloudflare Support;
+- translate generated drafts into English, Vietnamese, or Khmer while
+  preserving technical identifiers.
 
 The MCP server can:
 
@@ -141,6 +143,10 @@ environment secrets. Create a separate deployment token using Cloudflare's
 **Edit Cloudflare Workers** API token template and scope it to the deployment
 account. Do not reuse a customer's troubleshooting token for deployment.
 
+The included `.github/workflows/deploy.yml` workflow verifies and deploys the
+application when changes reach `main`. It also supports manual runs from the
+GitHub Actions page.
+
 When deploying from a Cursor Cloud Agent, you can instead authenticate the
 `Cloudflare-builds` MCP integration from the agent's **MCP** menu. Cursor IDE
 authentication under **Settings → Tools & MCP** is separate from Cloud Agent
@@ -160,6 +166,7 @@ The deployment exposes:
 
 - `/mcp` — authenticated Streamable HTTP MCP endpoint;
 - `/api/analyze` — rules-first text and Workers AI screenshot analysis;
+- `/api/translate` — English, Vietnamese, and Khmer case translation;
 - `/api/evidence` — adaptive evidence requirements;
 - `/api/case/*` — validation and draft generation;
 - `/api/cloudflare/*` — in-memory customer account connection;

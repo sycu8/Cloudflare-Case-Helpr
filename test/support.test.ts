@@ -69,6 +69,24 @@ describe("support case validation and drafting", () => {
     ).toEqual([expect.stringContaining("evidence.zip")]);
   });
 
+  it("requires additional incident ownership details for P1", () => {
+    const validation = validateSupportCase({
+      ...completeCase,
+      priority: "P1",
+      service: undefined,
+      impact: "Critical production outage affecting checkout",
+    });
+
+    expect(validation.ready).toBe(false);
+    expect(validation.missing).toEqual(
+      expect.arrayContaining([
+        "Affected Cloudflare service (required for P1)",
+        "Affected users or regions (required for P1)",
+        "Origin investigation status (required for P1)",
+      ]),
+    );
+  });
+
   it("redacts secrets from generated drafts", () => {
     const draft = generateCaseDraft({
       ...completeCase,

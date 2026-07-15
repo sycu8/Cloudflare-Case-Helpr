@@ -35,6 +35,7 @@ const elements = {
   generate: document.querySelector("#generate-draft"),
   draftWrap: document.querySelector("#draft-wrap"),
   draftOutput: document.querySelector("#draft-output"),
+  languageButtons: document.querySelectorAll(".language-button"),
   copy: document.querySelector("#copy-draft"),
   copyStatus: document.querySelector("#copy-status"),
   clear: document.querySelector("#clear-data"),
@@ -43,6 +44,7 @@ const elements = {
 
 let screenshotDataUrl;
 let pendingScreenshotAnalysis;
+let sourceDraft;
 let saveTimer;
 
 const requiredFields = [
@@ -56,6 +58,13 @@ const requiredFields = [
   ["reproduction", "Steps to reproduce"],
   ["evidence", "Error, Ray ID, or attachment"],
 ];
+const criticalRequiredFields = [
+  ["service", "Affected Cloudflare service (P1)"],
+  ["hostname", "Affected hostname (P1)"],
+  ["affectedUsers", "Affected users or regions (P1)"],
+  ["exactOrRay", "Exact error or Ray ID (P1)"],
+  ["originStatus", "Origin investigation status (P1)"],
+];
 
 restoreDraft();
 updateEvidence();
@@ -66,9 +75,7 @@ elements.form.addEventListener("input", () => {
   scheduleSave();
   updateProgress();
 });
-elements.form.elements.priority.addEventListener("change", () => {
-  elements.p1Alert.hidden = elements.form.elements.priority.value !== "P1";
-});
+elements.form.elements.priority.addEventListener("change", updateCriticalState);
 elements.form.elements.issueType.addEventListener("change", updateEvidence);
 
 elements.screenshot.addEventListener("change", async () => {
@@ -177,7 +184,9 @@ elements.generate.addEventListener("click", async () => {
       body: JSON.stringify(caseData()),
     });
     renderValidation(result.validation);
+    sourceDraft = result.body;
     elements.draftOutput.value = result.body;
+    setActiveLanguage();
     elements.draftWrap.hidden = false;
     elements.draftOutput.focus();
   } catch (error) {
@@ -187,6 +196,33 @@ elements.generate.addEventListener("click", async () => {
     setBusy(elements.generate, false, "Generate case draft");
   }
 });
+
+for (const button of elements.languageButtons) {
+  button.addEventListener("click", async () => {
+    if (!sourceDraft) return;
+    setLanguageButtonsBusy(true);
+    setStatus(elements.copyStatus, `Translating to ${button.textContent.trim()}…`);
+    try {
+      const result = await api("/api/translate", {
+        method: "POST",
+        body: JSON.stringify({
+          text: sourceDraft,
+          targetLanguage: button.dataset.language,
+        }),
+      });
+      elements.draftOutput.value = result.translation;
+      setActiveLanguage(button.dataset.language);
+      setStatus(
+        elements.copyStatus,
+        `Draft translated to ${button.textContent.trim()}. Review technical details before submission.`,
+      );
+    } catch (error) {
+      setStatus(elements.copyStatus, error.message, true);
+    } finally {
+      setLanguageButtonsBusy(false);
+    }
+  });
+}
 
 elements.copy.addEventListener("click", async () => {
   await navigator.clipboard.writeText(elements.draftOutput.value);
@@ -203,8 +239,9 @@ elements.clear.addEventListener("click", () => {
   elements.apiToken.value = "";
   elements.diagnosis.hidden = true;
   elements.draftWrap.hidden = true;
+  sourceDraft = undefined;
   elements.zonePicker.hidden = true;
-  elements.p1Alert.hidden = true;
+  updateCriticalState();
   removeScreenshot();
   updateEvidence();
   updateProgress();
@@ -266,19 +303,28 @@ function updateProgress() {
     actual: Boolean(data.actual),
     reproduction: Boolean(data.reproduction),
     evidence: Boolean(data.exactErrors || data.rayIds || data.attachments),
+    service: Boolean(data.service),
+    hostname: Boolean(data.hostnames),
+    affectedUsers: Boolean(data.affectedUsers),
+    exactOrRay: Boolean(data.exactErrors || data.rayIds),
+    originStatus: Boolean(data.originFindings),
   };
-  const done = Object.values(complete).filter(Boolean).length;
-  const score = Math.round((done / requiredFields.length) * 100);
+  const fields =
+    data.priority === "P1"
+      ? [...requiredFields, ...criticalRequiredFields]
+      : requiredFields;
+  const done = fields.filter(([key]) => complete[key]).length;
+  const score = Math.round((done / fields.length) * 100);
   elements.score.textContent = String(score);
   elements.progressBar.style.width = `${score}%`;
   elements.progressRing.style.background = `conic-gradient(var(--orange) ${score}%, #ebe8e3 ${score}%)`;
   elements.progressSummary.textContent =
     score === 100
       ? "Core case information is complete."
-      : `${requiredFields.length - done} required item(s) remaining.`;
+      : `${fields.length - done} required item(s) remaining.`;
 
   elements.checklist.replaceChildren(
-    ...requiredFields.map(([key, label]) => {
+    ...fields.map(([key, label]) => {
       const item = document.createElement("li");
       item.textContent = label;
       if (complete[key]) item.className = "done";
@@ -354,7 +400,7 @@ function restoreDraft() {
     for (const [name, value] of Object.entries(saved.form ?? {})) {
       if (elements.form.elements[name]) elements.form.elements[name].value = value;
     }
-    elements.p1Alert.hidden = elements.form.elements.priority.value !== "P1";
+    updateCriticalState();
   } catch {
     localStorage.removeItem(STORAGE_KEY);
   }
@@ -366,6 +412,12 @@ function removeScreenshot() {
   elements.screenshot.value = "";
   elements.fileChip.hidden = true;
   elements.confirmExtraction.checked = false;
+}
+
+function updateCriticalState() {
+  const isCritical = elements.form.elements.priority.value === "P1";
+  elements.p1Alert.hidden = !isCritical;
+  document.body.classList.toggle("is-critical", isCritical);
 }
 
 function readAsDataUrl(file) {
@@ -398,6 +450,16 @@ function setStatus(element, message, error = false) {
 function setBusy(button, busy, text) {
   button.disabled = busy;
   button.textContent = text;
+}
+
+function setLanguageButtonsBusy(busy) {
+  for (const button of elements.languageButtons) button.disabled = busy;
+}
+
+function setActiveLanguage(language) {
+  for (const button of elements.languageButtons) {
+    button.classList.toggle("active", button.dataset.language === language);
+  }
 }
 
 function formatBytes(bytes) {

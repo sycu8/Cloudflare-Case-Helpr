@@ -1,0 +1,70 @@
+name: Deploy to Cloudflare
+
+on:
+  push:
+    branches:
+      - main
+      - cursor/cloudflare-troubleshooting-mcp-1741
+  workflow_dispatch:
+
+concurrency:
+  group: cloudflare-production
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    name: Verify and deploy Worker
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.18.0
+          cache: npm
+
+      - name: Validate deployment secrets
+        env:
+          CF_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CF_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          python - <<'PY'
+          import os
+          import re
+
+          token = os.environ.get("CF_API_TOKEN", "")
+          account_id = os.environ.get("CF_ACCOUNT_ID", "")
+
+          if not token:
+              raise SystemExit("CLOUDFLARE_API_TOKEN is empty")
+          if token != token.strip():
+              raise SystemExit("CLOUDFLARE_API_TOKEN has surrounding whitespace")
+          if token.lower().startswith("bearer "):
+              raise SystemExit("CLOUDFLARE_API_TOKEN must not include a Bearer prefix")
+          if token.startswith(("'", '"')) or token.endswith(("'", '"')):
+              raise SystemExit("CLOUDFLARE_API_TOKEN must not include quotes")
+          if not re.fullmatch(r"[0-9a-fA-F]{32}", account_id):
+              raise SystemExit("CLOUDFLARE_ACCOUNT_ID must be a 32-character hexadecimal ID")
+
+          print("Deployment secret formats are valid")
+          PY
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Verify application
+        run: npm run check
+
+      - name: Deploy to Cloudflare
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: deploy
