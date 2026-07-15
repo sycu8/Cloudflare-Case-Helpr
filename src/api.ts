@@ -1,6 +1,9 @@
 import { z } from "zod";
 
-import { analyzeIssueWithOptionalImage } from "./ai";
+import {
+  analyzeIssueWithOptionalImage,
+  translateSupportContent,
+} from "./ai";
 import { CloudflareApiError, CloudflareClient } from "./cloudflare";
 import {
   generateCaseDraft,
@@ -79,6 +82,22 @@ export async function handleApi(
         issueType,
         evidence: getRequiredEvidence(issueType),
       });
+    }
+
+    if (url.pathname === "/api/translate" && request.method === "POST") {
+      const body = z
+        .object({
+          text: z.string().min(1).max(20_000),
+          targetLanguage: z.enum(["en", "vi", "km"]),
+        })
+        .parse(await readJson(request));
+      return Response.json(
+        await translateSupportContent(
+          env.AI,
+          body.text,
+          body.targetLanguage,
+        ),
+      );
     }
 
     if (url.pathname === "/api/case/validate" && request.method === "POST") {

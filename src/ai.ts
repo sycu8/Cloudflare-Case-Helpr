@@ -2,6 +2,11 @@ import { analyzeIssue, redactSecrets, type IssueAnalysis } from "./support";
 
 const VISION_MODEL = "@cf/meta/llama-4-scout-17b-16e-instruct";
 const MAX_IMAGE_DATA_URL_LENGTH = 5_700_000;
+const LANGUAGE_NAMES = {
+  en: "English",
+  vi: "Vietnamese",
+  km: "Khmer",
+} as const;
 
 export async function analyzeIssueWithOptionalImage(
   ai: Pick<Ai, "run">,
@@ -58,6 +63,33 @@ export async function analyzeIssueWithOptionalImage(
     redactions:
       redactedInput.redactions + redactSecrets(summaryRaw).redactions,
     needsConfirmation: true,
+  };
+}
+
+export async function translateSupportContent(
+  ai: Pick<Ai, "run">,
+  text: string,
+  targetLanguage: keyof typeof LANGUAGE_NAMES,
+): Promise<{ translation: string; redactions: number }> {
+  const redacted = redactSecrets(text.slice(0, 20_000));
+  const response = await ai.run(VISION_MODEL, {
+    messages: [
+      {
+        role: "system",
+        content:
+          "You translate Cloudflare technical support cases. Preserve headings, bullets, line breaks, product names, error codes, Ray IDs, hostnames, URLs, commands, timestamps, and empty field placeholders exactly where possible. Translate prose only. Do not add advice, explanations, markdown fences, or facts. Keep [REDACTED] unchanged.",
+      },
+      {
+        role: "user",
+        content: `Translate the following support case into ${LANGUAGE_NAMES[targetLanguage]}:\n\n${redacted.text}`,
+      },
+    ],
+    max_tokens: 4_000,
+    temperature: 0,
+  });
+  return {
+    translation: redactSecrets(getResponseText(response)).text.slice(0, 30_000),
+    redactions: redacted.redactions,
   };
 }
 

@@ -35,6 +35,7 @@ const elements = {
   generate: document.querySelector("#generate-draft"),
   draftWrap: document.querySelector("#draft-wrap"),
   draftOutput: document.querySelector("#draft-output"),
+  languageButtons: document.querySelectorAll(".language-button"),
   copy: document.querySelector("#copy-draft"),
   copyStatus: document.querySelector("#copy-status"),
   clear: document.querySelector("#clear-data"),
@@ -43,6 +44,7 @@ const elements = {
 
 let screenshotDataUrl;
 let pendingScreenshotAnalysis;
+let sourceDraft;
 let saveTimer;
 
 const requiredFields = [
@@ -182,7 +184,9 @@ elements.generate.addEventListener("click", async () => {
       body: JSON.stringify(caseData()),
     });
     renderValidation(result.validation);
+    sourceDraft = result.body;
     elements.draftOutput.value = result.body;
+    setActiveLanguage();
     elements.draftWrap.hidden = false;
     elements.draftOutput.focus();
   } catch (error) {
@@ -192,6 +196,33 @@ elements.generate.addEventListener("click", async () => {
     setBusy(elements.generate, false, "Generate case draft");
   }
 });
+
+for (const button of elements.languageButtons) {
+  button.addEventListener("click", async () => {
+    if (!sourceDraft) return;
+    setLanguageButtonsBusy(true);
+    setStatus(elements.copyStatus, `Translating to ${button.textContent.trim()}…`);
+    try {
+      const result = await api("/api/translate", {
+        method: "POST",
+        body: JSON.stringify({
+          text: sourceDraft,
+          targetLanguage: button.dataset.language,
+        }),
+      });
+      elements.draftOutput.value = result.translation;
+      setActiveLanguage(button.dataset.language);
+      setStatus(
+        elements.copyStatus,
+        `Draft translated to ${button.textContent.trim()}. Review technical details before submission.`,
+      );
+    } catch (error) {
+      setStatus(elements.copyStatus, error.message, true);
+    } finally {
+      setLanguageButtonsBusy(false);
+    }
+  });
+}
 
 elements.copy.addEventListener("click", async () => {
   await navigator.clipboard.writeText(elements.draftOutput.value);
@@ -208,6 +239,7 @@ elements.clear.addEventListener("click", () => {
   elements.apiToken.value = "";
   elements.diagnosis.hidden = true;
   elements.draftWrap.hidden = true;
+  sourceDraft = undefined;
   elements.zonePicker.hidden = true;
   updateCriticalState();
   removeScreenshot();
@@ -418,6 +450,16 @@ function setStatus(element, message, error = false) {
 function setBusy(button, busy, text) {
   button.disabled = busy;
   button.textContent = text;
+}
+
+function setLanguageButtonsBusy(busy) {
+  for (const button of elements.languageButtons) button.disabled = busy;
+}
+
+function setActiveLanguage(language) {
+  for (const button of elements.languageButtons) {
+    button.classList.toggle("active", button.dataset.language === language);
+  }
 }
 
 function formatBytes(bytes) {

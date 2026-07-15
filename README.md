@@ -13,7 +13,9 @@ The browser application can:
 - validate case completeness and attachment formats;
 - warn about possible secrets and unsupported P1 priority;
 - save drafts locally on the customer's device; and
-- generate a concise case ready to copy into Cloudflare Support.
+- generate a concise case ready to copy into Cloudflare Support;
+- translate generated drafts into English, Vietnamese, or Khmer while
+  preserving technical identifiers.
 
 The MCP server can:
 
@@ -164,6 +166,7 @@ The deployment exposes:
 
 - `/mcp` — authenticated Streamable HTTP MCP endpoint;
 - `/api/analyze` — rules-first text and Workers AI screenshot analysis;
+- `/api/translate` — English, Vietnamese, and Khmer case translation;
 - `/api/evidence` — adaptive evidence requirements;
 - `/api/case/*` — validation and draft generation;
 - `/api/cloudflare/*` — in-memory customer account connection;
