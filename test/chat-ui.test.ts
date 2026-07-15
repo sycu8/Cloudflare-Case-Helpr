@@ -23,6 +23,14 @@ describe("local chatbot UI", () => {
     expect(script).toContain("P1 requires ongoing customer availability");
   });
 
+  it("asks for impacted services when Other is selected", () => {
+    expect(script).toContain('data.issueType === "other"');
+    expect(script).toContain(
+      "Which Cloudflare service or services are impacted?",
+    );
+    expect(script).toContain('["service", "Impacted service(s)"]');
+  });
+
   it("accepts screenshots pasted from the clipboard", () => {
     expect(script).toContain('elements.composer.addEventListener("paste"');
     expect(script).toContain("event.clipboardData?.items");

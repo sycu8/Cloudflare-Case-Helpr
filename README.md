@@ -10,6 +10,7 @@ The browser application can:
   directly into the chat with Workers AI;
 - identify common Cloudflare errors, Ray IDs, hostnames, and UTC timestamps;
 - conduct a local adaptive chat that asks only for missing minimum case fields;
+- request custom impacted service names when the customer selects **Other**;
 - show Cloudflare and origin evidence-collection guidance with each question;
 - accept conversational incident times and normalize them to UTC for log
   correlation;

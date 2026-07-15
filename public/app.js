@@ -66,10 +66,10 @@ const questions = {
     ],
   },
   service: {
-    prompt: "Which Cloudflare service is affected?",
+    prompt: "Which Cloudflare service or services are impacted?",
     guidance:
-      "Use the product name shown in the Dashboard, for example CDN, DNS, WAF, Workers, Access, Gateway, or Magic Transit.",
-    placeholder: "Example: CDN and WAF",
+      "Enter the product names shown in the Dashboard. You can list more than one, for example CDN, Load Balancing, R2, Stream, Access, Gateway, or Magic Transit.",
+    placeholder: "Example: CDN, Load Balancing, and R2",
   },
   hostnames: {
     prompt: "What zone or hostname is affected?",
@@ -411,8 +411,11 @@ function askNextQuestion() {
 function findNextQuestion() {
   const data = state.caseData;
   const order = [...coreQuestionOrder];
+  if (data.issueType === "other") {
+    order.splice(1, 0, "service");
+  }
   if (data.priority === "P1") {
-    order.splice(2, 0, "service");
+    if (data.issueType !== "other") order.splice(2, 0, "service");
     order.splice(7, 0, "affectedUsers");
     order.push("originFindings");
   }
@@ -809,9 +812,14 @@ function requiredFields() {
     ["reproduction", "Reproduction"],
     ["evidence", "Error or Ray ID"],
   ];
+  if (state.caseData.issueType === "other") {
+    base.splice(1, 0, ["service", "Impacted service(s)"]);
+  }
   if (state.caseData.priority === "P1") {
+    if (state.caseData.issueType !== "other") {
+      base.push(["service", "Affected service"]);
+    }
     base.push(
-      ["service", "Affected service"],
       ["affectedUsers", "Affected users"],
       ["originFindings", "Origin status"],
     );
