@@ -30,7 +30,6 @@ const elements = {
   draftPanel: document.querySelector("#draft-panel"),
   draftOutput: document.querySelector("#draft-output"),
   draftStatus: document.querySelector("#draft-status"),
-  draftLanguageButtons: document.querySelectorAll("[data-draft-language]"),
   copyDraft: document.querySelector("#copy-draft"),
   languageMenu: document.querySelector("#language-menu"),
   languageMenuToggle: document.querySelector("#language-menu-toggle"),
@@ -201,7 +200,6 @@ const localErrorRules = {
 
 let screenshotDataUrl;
 let state = loadState() ?? createInitialState();
-let sourceDraft = state.draft || "";
 let saveTimer;
 let isSubmitting = false;
 let lastSubmittedText = "";
@@ -303,7 +301,6 @@ elements.clear.addEventListener("click", () => {
   if (!window.confirm("Start a new case and remove this local chat and draft?")) return;
   localStorage.removeItem(STORAGE_KEY);
   state = createInitialState();
-  sourceDraft = "";
   removeScreenshot();
   initializeConversation();
 });
@@ -312,31 +309,6 @@ elements.copyDraft.addEventListener("click", async () => {
   await navigator.clipboard.writeText(elements.draftOutput.value);
   elements.draftStatus.textContent = "Case draft copied.";
 });
-
-for (const button of elements.draftLanguageButtons) {
-  button.addEventListener("click", async () => {
-    if (!sourceDraft) return;
-    setDraftButtonsBusy(true);
-    elements.draftStatus.textContent = `Translating to ${button.textContent.trim()}…`;
-    try {
-      const result = await api("/api/translate", {
-        method: "POST",
-        body: JSON.stringify({
-          text: sourceDraft,
-          targetLanguage: button.dataset.draftLanguage,
-        }),
-      });
-      elements.draftOutput.value = result.translation;
-      setActiveDraftLanguage(button.dataset.draftLanguage);
-      elements.draftStatus.textContent =
-        "Translation complete. Review technical values before submission.";
-    } catch (error) {
-      elements.draftStatus.textContent = error.message;
-    } finally {
-      setDraftButtonsBusy(false);
-    }
-  });
-}
 
 function createInitialState() {
   return {
@@ -702,8 +674,7 @@ function applyAnalysisSignals(analysis) {
 function completeCase() {
   state.phase = "complete";
   state.currentQuestion = "";
-  sourceDraft = generateCaseDraft(state.caseData);
-  state.draft = sourceDraft;
+  state.draft = generateCaseDraft(state.caseData);
   addMessage(
     "assistant",
     "The minimum information is complete. I generated a Support case draft in the case panel.",
@@ -920,7 +891,6 @@ function renderDraft() {
     elements.draftPanel.hidden = true;
     return;
   }
-  sourceDraft = state.draft;
   elements.draftOutput.value = state.draft;
   elements.draftPanel.hidden = false;
 }
@@ -1009,19 +979,6 @@ function formatBytes(bytes) {
   return bytes < 1024 * 1024
     ? `${Math.ceil(bytes / 1024)} KB`
     : `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-}
-
-function setDraftButtonsBusy(busy) {
-  for (const button of elements.draftLanguageButtons) button.disabled = busy;
-}
-
-function setActiveDraftLanguage(language) {
-  for (const button of elements.draftLanguageButtons) {
-    button.classList.toggle(
-      "active",
-      button.dataset.draftLanguage === language,
-    );
-  }
 }
 
 function initializeLanguageMenu() {

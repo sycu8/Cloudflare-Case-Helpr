@@ -17,6 +17,12 @@ describe("local chatbot UI", () => {
     expect(script).toContain("localStorage.setItem(STORAGE_KEY");
   });
 
+  it("keeps generated Support case drafts in English only", () => {
+    expect(html).not.toContain("Translate draft");
+    expect(html).not.toContain("data-draft-language");
+    expect(script).not.toContain('api("/api/translate"');
+  });
+
   it("provides collection guidance for minimum and P1 questions", () => {
     expect(script).toContain("How often does the problem happen?");
     expect(script).toContain("What did you find at the origin?");

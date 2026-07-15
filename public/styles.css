@@ -658,38 +658,6 @@ main {
   line-height: 1.45;
 }
 
-.draft-language {
-  margin: 10px 0;
-}
-
-.draft-language > span {
-  color: var(--muted);
-  font-size: 0.68rem;
-}
-
-.draft-language > div {
-  display: flex;
-  gap: 5px;
-  margin-top: 5px;
-}
-
-.draft-language button {
-  flex: 1;
-  min-height: 29px;
-  padding: 0 4px;
-  color: #514d48;
-  background: #fff;
-  border: 1px solid #cdc8c1;
-  border-radius: 6px;
-  font-size: 0.64rem;
-}
-
-.draft-language button.active {
-  color: #fff;
-  background: var(--orange-dark);
-  border-color: var(--orange-dark);
-}
-
 .draft-note {
   margin-top: 9px;
 }

@@ -19,8 +19,6 @@ The browser application can:
 - store chat, answers, and drafts only in the customer's browser;
 - generate the copy-ready Support case locally without sending answers to the
   server;
-- translate generated drafts into English, Vietnamese, or Khmer while
-  preserving technical identifiers; and
 - switch the full website interface from the persistent language menu, with
   translated UI content cached locally by language and content version.
 
@@ -53,8 +51,7 @@ The Worker:
 - never returns the token in a tool response;
 - sends the token only to `api.cloudflare.com`;
 - sends screenshots only to the configured Workers AI binding for the requested
-  analysis and sends draft content only when the customer explicitly requests
-  translation;
+  analysis;
 - removes URL query strings from request logs by default;
 - does not request client IP or cookie fields;
 - limits Logpull responses to 100 records and 1 MB; and
@@ -175,7 +172,6 @@ The deployment exposes:
 
 - `/mcp` — authenticated Streamable HTTP MCP endpoint;
 - `/api/analyze` — rules-first text and Workers AI screenshot analysis;
-- `/api/translate` — English, Vietnamese, and Khmer case translation;
 - `/api/translate-ui` — ordered website-interface translation for local caching;
 - `/api/evidence` — adaptive evidence requirements;
 - `/api/case/*` — validation and draft generation;

@@ -2,7 +2,6 @@ import { describe, expect, it, vi } from "vitest";
 
 import {
   analyzeIssueWithOptionalImage,
-  translateSupportContent,
   translateUiContent,
 } from "../src/ai";
 
@@ -52,33 +51,6 @@ describe("screenshot analysis", () => {
       ),
     ).rejects.toThrow(/PNG, JPEG, GIF, or WebP/);
     expect(run).not.toHaveBeenCalled();
-  });
-
-  it("translates support content while requesting technical-value preservation", async () => {
-    const run = vi.fn().mockResolvedValue({
-      response:
-        "Lỗi thực tế: Cloudflare Error 522\nRay ID: 49ddb3e70e665831",
-    });
-
-    const result = await translateSupportContent(
-      { run },
-      "Actual result: Cloudflare Error 522\nRay ID: 49ddb3e70e665831",
-      "vi",
-    );
-
-    expect(result.translation).toContain("Cloudflare Error 522");
-    expect(result.translation).toContain("49ddb3e70e665831");
-    expect(run.mock.calls[0]?.[1]).toMatchObject({
-      messages: [
-        expect.objectContaining({
-          content: expect.stringContaining("Preserve headings"),
-        }),
-        expect.objectContaining({
-          content: expect.stringContaining("Vietnamese"),
-        }),
-      ],
-      temperature: 0,
-    });
   });
 
   it("returns ordered UI translations for browser caching", async () => {
