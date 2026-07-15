@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+// @ts-expect-error Browser utility is intentionally shipped as plain JavaScript.
 import { parseHumanUtc } from "../public/chat-utils.js";
 
 const referenceDate = new Date("2026-07-15T06:45:00Z");

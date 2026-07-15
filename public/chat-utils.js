@@ -2,6 +2,15 @@ export function parseHumanUtc(input, referenceDate = new Date()) {
   const value = input.trim();
   if (!value) return "";
 
+  if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:?\d{2})$/i.test(value)) {
+    const timestamp = Date.parse(value);
+    return Number.isNaN(timestamp) ? "" : new Date(timestamp).toISOString();
+  }
+  if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?$/.test(value)) {
+    const timestamp = Date.parse(`${value}Z`);
+    return Number.isNaN(timestamp) ? "" : new Date(timestamp).toISOString();
+  }
+
   const relative = parseRelativeDate(value, referenceDate);
   if (relative) return relative.toISOString();
 
