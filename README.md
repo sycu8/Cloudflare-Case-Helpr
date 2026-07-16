@@ -20,7 +20,9 @@ The browser application can:
 - generate the copy-ready Support case locally without sending answers to the
   server;
 - switch the full website interface from the persistent language menu, with
-  translated UI content cached locally by language and content version.
+  translated UI content cached locally by language and content version; and
+- provide an Open Graph and large Twitter/X preview image when the public link
+  is shared.
 
 The MCP server can:
 

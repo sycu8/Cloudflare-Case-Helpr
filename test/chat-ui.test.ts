@@ -23,6 +23,12 @@ describe("local chatbot UI", () => {
     expect(script).not.toContain('api("/api/translate"');
   });
 
+  it("provides an image preview when the public link is shared", () => {
+    expect(html).toContain('property="og:image"');
+    expect(html).toContain('name="twitter:card" content="summary_large_image"');
+    expect(html).toContain("cloudflare-case-helper-social.png");
+  });
+
   it("provides collection guidance for minimum and P1 questions", () => {
     expect(script).toContain("How often does the problem happen?");
     expect(script).toContain("What did you find at the origin?");
