@@ -737,6 +737,7 @@ legend {
 footer {
   display: flex;
   justify-content: space-between;
+  align-items: center;
   gap: 20px;
   padding: 25px 4vw;
   color: var(--muted);
@@ -747,6 +748,16 @@ footer {
 
 footer p {
   margin: 0;
+}
+
+.footer-sponsor {
+  display: flex;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.footer-sponsor a {
+  line-height: 0;
 }
 
 @media (max-width: 900px) {
@@ -830,6 +841,11 @@ footer p {
 
   footer {
     flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .footer-sponsor {
+    order: -1;
   }
 }
 
