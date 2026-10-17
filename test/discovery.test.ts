@@ -125,6 +125,7 @@ describe("agent discovery", () => {
       agent_auth: {
         skill: string;
         register_uri: string;
+        claim_uri: string;
         identity_types_supported: string[];
         anonymous: { credential_types_supported: string[]; claim_uri: string };
       };
@@ -141,7 +142,7 @@ describe("agent discovery", () => {
     expect(resource.status).toBe(200);
     expect(asBody.issuer).toBe(origin);
     expect(resourceBody.authorization_servers).toEqual([asBody.issuer]);
-    expect(resourceBody.resource).toBe(`${origin}/mcp`);
+    expect(resourceBody.resource).toBe(origin);
     expect(resourceBody.bearer_methods_supported).toContain("header");
     expect(resourceBody.scopes_supported.length).toBeGreaterThan(0);
     expect(asBody.authorization_endpoint).toBe(`${origin}/oauth/authorize`);
@@ -151,6 +152,7 @@ describe("agent discovery", () => {
     expect(asBody.response_types_supported.length).toBeGreaterThan(0);
     expect(asBody.agent_auth.skill).toBe(`${origin}/auth.md`);
     expect(asBody.agent_auth.register_uri).toMatch(/^https:\/\//);
+    expect(asBody.agent_auth.claim_uri).toMatch(/^https:\/\//);
     expect(asBody.agent_auth.identity_types_supported).toEqual(["anonymous"]);
     expect(asBody.agent_auth.anonymous.credential_types_supported).toEqual([
       "api_key",

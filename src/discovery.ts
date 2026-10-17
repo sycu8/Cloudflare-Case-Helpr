@@ -254,7 +254,9 @@ Enable only the permissions the task needs:
 
 ## Protected resources
 
-Resource identifier: \`${origin}/mcp\`
+Resource identifier: \`${origin}\`
+
+Protected paths under that resource:
 
 - \`/mcp\` — Streamable HTTP MCP
 - \`GET /api/cloudflare/connection\`
@@ -477,6 +479,7 @@ function authorizationServer(origin: string) {
     agent_auth: {
       skill: `${origin}/auth.md`,
       register_uri: TOKEN_PAGE,
+      claim_uri: TOKEN_PAGE,
       revocation_uri: TOKEN_PAGE,
       identity_types_supported: ["anonymous"],
       anonymous: {
@@ -489,7 +492,7 @@ function authorizationServer(origin: string) {
 
 function protectedResource(origin: string) {
   return {
-    resource: `${origin}/mcp`,
+    resource: origin,
     resource_name: "Cloudflare Support Case Helper",
     authorization_servers: [origin],
     scopes_supported: protectedScopes(),
