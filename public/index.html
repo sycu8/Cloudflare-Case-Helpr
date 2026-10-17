@@ -9,6 +9,23 @@
     />
     <title>Cloudflare Support Case Helper</title>
     <link rel="stylesheet" href="/styles.css" />
+    <link rel="api-catalog" href="/.well-known/api-catalog" />
+    <link
+      rel="service-desc"
+      href="/.well-known/openapi.json"
+      type="application/openapi+json"
+    />
+    <link rel="service-doc" href="/auth.md" type="text/markdown" />
+    <link
+      rel="describedby"
+      href="/.well-known/ai-catalog.json"
+      type="application/json"
+    />
+    <link
+      rel="describedby"
+      href="/.well-known/mcp/server-card.json"
+      type="application/json"
+    />
     <script type="module" src="/app.js"></script>
   </head>
   <body>
@@ -201,13 +218,17 @@
               </span>
             </div>
 
-            <form id="case-form">
+            <form
+              id="case-form"
+              toolname="prepare_support_case"
+              tooldescription="Fill the incident details on this page and prepare a Cloudflare Support case draft. Do not include secrets, API tokens, cookies, or private keys."
+            >
               <fieldset>
                 <legend>Scope and impact</legend>
                 <div class="field-grid">
                   <label>
                     Issue type
-                    <select name="issueType">
+                    <select name="issueType" toolparamdescription="Cloudflare issue category, such as outage, dns, ssl, or workers.">
                       <option value="outage">Outage or availability</option>
                       <option value="performance">Performance</option>
                       <option value="dns">DNS</option>
@@ -220,7 +241,7 @@
                   </label>
                   <label>
                     Priority
-                    <select name="priority">
+                    <select name="priority" toolparamdescription="Support priority from P1 (critical) through P4 (low).">
                       <option value="">Choose priority</option>
                       <option value="P1">P1 · Critical impact</option>
                       <option value="P2">P2 · High impact</option>
@@ -231,40 +252,40 @@
                   <label>
                     Cloudflare service
                     <span class="critical-note">Required for P1</span>
-                    <input name="service" placeholder="CDN, DNS, WAF, Workers…" />
+                    <input name="service" toolparamdescription="Affected Cloudflare product, such as CDN, DNS, WAF, or Workers. Required for P1." placeholder="CDN, DNS, WAF, Workers…" />
                   </label>
                   <label>
                     Started in UTC
                     <span class="critical-note">Required for P1</span>
-                    <input name="startedUtc" type="datetime-local" />
+                    <input name="startedUtc" type="datetime-local" toolparamdescription="When the incident started, as a datetime-local value YYYY-MM-DDTHH:mm. Required for P1." />
                   </label>
                   <label>
                     Zone name
-                    <input name="zoneName" placeholder="example.com" />
+                    <input name="zoneName" toolparamdescription="Affected Cloudflare zone name, such as example.com." placeholder="example.com" />
                   </label>
                   <label>
                     Zone ID
-                    <input name="zoneId" placeholder="32-character ID" />
+                    <input name="zoneId" toolparamdescription="32-character Cloudflare zone ID, if known." placeholder="32-character ID" />
                   </label>
                   <label class="span-2">
                     Affected hostname(s)
                     <span class="critical-note">Required for P1</span>
-                    <input name="hostnames" placeholder="api.example.com" />
+                    <input name="hostnames" toolparamdescription="Affected hostnames. Required for P1." placeholder="api.example.com" />
                   </label>
                   <label>
                     Frequency
                     <span class="critical-note">Required for P1</span>
-                    <input name="frequency" placeholder="Every request, intermittent, once…" />
+                    <input name="frequency" toolparamdescription="How often the problem happens. Required for P1." placeholder="Every request, intermittent, once…" />
                   </label>
                   <label>
                     Affected users or regions
                     <span class="critical-note">Required for P1</span>
-                    <input name="affectedUsers" placeholder="All users, APAC only, one ISP…" />
+                    <input name="affectedUsers" toolparamdescription="Who is affected, such as all users, one region, or one ISP. Required for P1." placeholder="All users, APAC only, one ISP…" />
                   </label>
                   <label class="span-2">
                     Production and business impact
                     <span class="critical-note">Required for P1</span>
-                    <textarea name="impact" rows="3" placeholder="What cannot users or the business do?"></textarea>
+                    <textarea name="impact" rows="3" toolparamdescription="Production and business impact. Required for P1." placeholder="What cannot users or the business do?"></textarea>
                   </label>
                 </div>
               </fieldset>
@@ -275,31 +296,31 @@
                   <label class="span-2">
                     Expected behavior
                     <span class="critical-note">Required for P1</span>
-                    <textarea name="expected" rows="3"></textarea>
+                    <textarea name="expected" rows="3" toolparamdescription="What should have happened. Required for P1."></textarea>
                   </label>
                   <label class="span-2">
                     Actual behavior
                     <span class="critical-note">Required for P1</span>
-                    <textarea name="actual" rows="3"></textarea>
+                    <textarea name="actual" rows="3" toolparamdescription="What happened instead. Required for P1."></textarea>
                   </label>
                   <label class="span-2">
                     Steps to reproduce
                     <span class="critical-note">Required for P1</span>
-                    <textarea name="reproduction" rows="4" placeholder="1. Open…&#10;2. Submit…&#10;3. Observe…"></textarea>
+                    <textarea name="reproduction" rows="4" toolparamdescription="Steps to reproduce the issue. Required for P1." placeholder="1. Open…&#10;2. Submit…&#10;3. Observe…"></textarea>
                   </label>
                   <label class="span-2">
                     Example URL(s)
-                    <textarea name="exampleUrls" rows="2" placeholder="Remove sensitive query parameters."></textarea>
+                    <textarea name="exampleUrls" rows="2" toolparamdescription="Example URLs with sensitive query parameters removed." placeholder="Remove sensitive query parameters."></textarea>
                   </label>
                   <label class="span-2">
                     Exact error message(s)
                     <span class="critical-note">Exact error or Ray ID required for P1</span>
-                    <textarea name="exactErrors" rows="3"></textarea>
+                    <textarea name="exactErrors" rows="3" toolparamdescription="Exact error text shown to the user. An exact error or a Ray ID is required for P1."></textarea>
                   </label>
                   <label class="span-2">
                     Ray ID(s)
                     <span class="critical-note">Exact error or Ray ID required for P1</span>
-                    <input name="rayIds" placeholder="One or more Ray IDs from failed requests" />
+                    <input name="rayIds" toolparamdescription="Cloudflare Ray IDs from failed requests. An exact error or a Ray ID is required for P1." placeholder="One or more Ray IDs from failed requests" />
                   </label>
                 </div>
               </fieldset>
@@ -309,21 +330,21 @@
                 <div class="field-grid">
                   <label class="span-2">
                     Recent changes
-                    <textarea name="recentChanges" rows="3" placeholder="Cloudflare configuration, origin deployment, certificate or network changes"></textarea>
+                    <textarea name="recentChanges" rows="3" toolparamdescription="Recent Cloudflare, origin, certificate, or network changes." placeholder="Cloudflare configuration, origin deployment, certificate or network changes"></textarea>
                   </label>
                   <label class="span-2">
                     Origin and log findings
                     <span class="critical-note">Investigation status required for P1</span>
-                    <textarea name="originFindings" rows="4" placeholder="Include matching UTC timestamps, not secrets."></textarea>
+                    <textarea name="originFindings" rows="4" toolparamdescription="Origin and log findings with UTC timestamps. Required for P1. Do not include secrets." placeholder="Include matching UTC timestamps, not secrets."></textarea>
                   </label>
                   <label class="span-2">
                     Attachments prepared
-                    <textarea name="attachments" rows="3" placeholder="HAR, screenshot.png, origin-log.txt, mtr.txt"></textarea>
+                    <textarea name="attachments" rows="3" toolparamdescription="Attachment filenames already prepared, such as a HAR or origin log. Do not ZIP HAR files." placeholder="HAR, screenshot.png, origin-log.txt, mtr.txt"></textarea>
                     <span class="hint">Cloudflare accepts supported files up to 20 MB. Do not ZIP HAR files.</span>
                   </label>
                   <label class="span-2">
                     Case participants
-                    <input name="participants" placeholder="People to CC" />
+                    <input name="participants" toolparamdescription="People to copy on the support case." placeholder="People to CC" />
                   </label>
                 </div>
               </fieldset>
