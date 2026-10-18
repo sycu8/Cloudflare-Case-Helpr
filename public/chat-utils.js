@@ -129,3 +129,42 @@ function normalizeHour(hour, meridiem) {
 function isValidDate(value) {
   return !Number.isNaN(value.getTime());
 }
+
+const DRAFT_LANGUAGE_NAMES = {
+  en: "English",
+  vi: "Tiếng Việt",
+  km: "ខ្មែរ",
+};
+
+export function normalizeDraftLanguage(language) {
+  return language === "vi" || language === "km" ? language : "en";
+}
+
+export function draftTranslationRequest(englishDraft, language) {
+  const targetLanguage = normalizeDraftLanguage(language);
+  if (targetLanguage === "en" || !String(englishDraft ?? "").trim()) return null;
+  return {
+    path: "/api/translate",
+    body: {
+      text: englishDraft,
+      targetLanguage,
+    },
+  };
+}
+
+export function displayedDraft(englishDraft, language, translation) {
+  const targetLanguage = normalizeDraftLanguage(language);
+  if (targetLanguage === "en") {
+    return { text: englishDraft, language: "en", fellBack: false };
+  }
+  if (typeof translation === "string" && translation.trim()) {
+    return { text: translation, language: targetLanguage, fellBack: false };
+  }
+  return { text: englishDraft, language: "en", fellBack: true };
+}
+
+export function draftStatusMessage(language, fellBack) {
+  if (fellBack) return "Translation failed. Showing the English draft.";
+  const name = DRAFT_LANGUAGE_NAMES[normalizeDraftLanguage(language)];
+  return `Draft shown in ${name}.`;
+}

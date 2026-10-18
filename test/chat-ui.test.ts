@@ -17,10 +17,15 @@ describe("local chatbot UI", () => {
     expect(script).toContain("localStorage.setItem(STORAGE_KEY");
   });
 
-  it("keeps generated Support case drafts in English only", () => {
-    expect(html).not.toContain("Translate draft");
-    expect(html).not.toContain("data-draft-language");
-    expect(script).not.toContain('api("/api/translate"');
+  it("shows the case draft in the language selected from the menu", () => {
+    expect(html).toContain("The draft follows the language menu.");
+    expect(script).toContain("normalizeDraftLanguage");
+    expect(script).toContain("draftTranslationRequest");
+    expect(script).toContain("displayedDraft");
+    expect(script).toContain("draftStatusMessage");
+    expect(script).toContain("function refreshDisplayedDraft()");
+    expect(script).toContain("api(request.path");
+    expect(script).toContain("uiLanguage = language");
   });
 
   it("provides an image preview when the public link is shared", () => {

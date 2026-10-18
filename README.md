@@ -16,9 +16,10 @@ The browser application can:
   correlation;
 - increase requirements automatically for P1 critical incidents;
 - warn about possible secrets and unsupported P1 priority;
-- store chat, answers, and drafts only in the customer's browser;
-- generate the copy-ready Support case locally in English without sending
-  answers to the server;
+- store chat and answers only in the customer's browser;
+- generate the copy-ready Support case locally in English, then show that draft
+  in the language selected from the menu;
+- use English when Vietnamese or Khmer draft translation fails;
 - switch the full website interface from the persistent language menu, with
   translated UI content cached locally by language and content version; and
 - provide an Open Graph and large Twitter/X preview image when the public link
@@ -49,7 +50,9 @@ chat message or pass it as a tool argument.
 The Worker:
 
 - keeps no customer token, screenshot, draft, or log data in server-side storage;
-- does not receive normal chat answers or locally generated case drafts;
+- does not receive normal chat answers;
+- sends a finished case draft to Workers AI only when the selected language is
+  Vietnamese or Khmer;
 - never returns the token in a tool response;
 - sends the token only to `api.cloudflare.com`;
 - sends screenshots only to the configured Workers AI binding for the requested
