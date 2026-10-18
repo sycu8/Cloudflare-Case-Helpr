@@ -107,6 +107,10 @@ elements.form.addEventListener("input", () => {
   scheduleSave();
   updateProgress();
 });
+elements.form.addEventListener("submit", (event) => {
+  event.preventDefault();
+  void generateDraft();
+});
 elements.form.elements.priority.addEventListener("change", updateCriticalState);
 elements.form.elements.issueType.addEventListener("change", updateEvidence);
 
@@ -131,37 +135,8 @@ elements.screenshot.addEventListener("change", async () => {
 
 elements.removeFile.addEventListener("click", removeScreenshot);
 
-elements.analyze.addEventListener("click", async () => {
-  if (!elements.message.value.trim() && !screenshotDataUrl) {
-    setStatus(elements.analyzeStatus, "Describe the issue or add a screenshot.", true);
-    elements.message.focus();
-    return;
-  }
-  setBusy(elements.analyze, true, "Analyzing…");
-  setStatus(elements.analyzeStatus, "Looking for error codes and request details…");
-  try {
-    const analysis = await api("/api/analyze", {
-      method: "POST",
-      body: JSON.stringify({
-        message: elements.message.value,
-        ...(screenshotDataUrl ? { imageDataUrl: screenshotDataUrl } : {}),
-      }),
-    });
-    renderAnalysis(analysis);
-    if (analysis.aiUsed) {
-      pendingScreenshotAnalysis = analysis;
-    } else {
-      applySignals(analysis);
-    }
-    const redactionMessage = analysis.redactions
-      ? ` ${analysis.redactions} possible secret value(s) were redacted.`
-      : "";
-    setStatus(elements.analyzeStatus, `Analysis complete.${redactionMessage}`);
-  } catch (error) {
-    setStatus(elements.analyzeStatus, error.message, true);
-  } finally {
-    setBusy(elements.analyze, false, "Analyze issue");
-  }
+elements.analyze.addEventListener("click", () => {
+  void analyzeIssue();
 });
 
 elements.confirmExtraction.addEventListener("change", () => {
@@ -208,25 +183,8 @@ elements.zoneSelect.addEventListener("change", () => {
   updateProgress();
 });
 
-elements.generate.addEventListener("click", async () => {
-  setBusy(elements.generate, true, "Checking…");
-  try {
-    const result = await api("/api/case/draft", {
-      method: "POST",
-      body: JSON.stringify(caseData()),
-    });
-    renderValidation(result.validation);
-    sourceDraft = result.body;
-    elements.draftOutput.value = result.body;
-    setActiveLanguage();
-    elements.draftWrap.hidden = false;
-    elements.draftOutput.focus();
-  } catch (error) {
-    elements.validation.textContent = error.message;
-    elements.validation.className = "validation-message warning";
-  } finally {
-    setBusy(elements.generate, false, "Generate case draft");
-  }
+elements.generate.addEventListener("click", () => {
+  void generateDraft();
 });
 
 for (const button of elements.languageButtons) {
@@ -313,13 +271,73 @@ function setIfEmpty(name, value) {
   }
 }
 
+async function analyzeIssue() {
+  if (!elements.message.value.trim() && !screenshotDataUrl) {
+    setStatus(elements.analyzeStatus, "Describe the issue or add a screenshot.", true);
+    elements.message.focus();
+    return { error: "Describe the issue or add a screenshot." };
+  }
+  setBusy(elements.analyze, true, "Analyzing…");
+  setStatus(elements.analyzeStatus, "Looking for error codes and request details…");
+  try {
+    const analysis = await api("/api/analyze", {
+      method: "POST",
+      body: JSON.stringify({
+        message: elements.message.value,
+        ...(screenshotDataUrl ? { imageDataUrl: screenshotDataUrl } : {}),
+      }),
+    });
+    renderAnalysis(analysis);
+    if (analysis.aiUsed) {
+      pendingScreenshotAnalysis = analysis;
+    } else {
+      applySignals(analysis);
+    }
+    const redactionMessage = analysis.redactions
+      ? ` ${analysis.redactions} possible secret value(s) were redacted.`
+      : "";
+    setStatus(elements.analyzeStatus, `Analysis complete.${redactionMessage}`);
+    return analysis;
+  } catch (error) {
+    setStatus(elements.analyzeStatus, error.message, true);
+    return { error: error.message };
+  } finally {
+    setBusy(elements.analyze, false, "Analyze issue");
+  }
+}
+
+async function generateDraft() {
+  setBusy(elements.generate, true, "Checking…");
+  try {
+    const result = await api("/api/case/draft", {
+      method: "POST",
+      body: JSON.stringify(caseData()),
+    });
+    renderValidation(result.validation);
+    sourceDraft = result.body;
+    elements.draftOutput.value = result.body;
+    setActiveLanguage();
+    elements.draftWrap.hidden = false;
+    elements.draftOutput.focus();
+    return result;
+  } catch (error) {
+    elements.validation.textContent = error.message;
+    elements.validation.className = "validation-message warning";
+    return { error: error.message };
+  } finally {
+    setBusy(elements.generate, false, "Generate case draft");
+  }
+}
+
 async function updateEvidence() {
   try {
     const issueType = elements.form.elements.issueType.value || "other";
     const result = await api(`/api/evidence?issue_type=${encodeURIComponent(issueType)}`);
     fillList(elements.issueEvidence, result.evidence);
+    return result;
   } catch {
     fillList(elements.issueEvidence, ["Collect relevant Cloudflare and origin evidence."]);
+    return { error: "Could not load the evidence checklist." };
   }
 }
 
@@ -652,4 +670,115 @@ function formatBytes(bytes) {
   return bytes < 1024 * 1024
     ? `${Math.ceil(bytes / 1024)} KB`
     : `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+const caseFieldSchema = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    issueType: { type: "string", description: "Issue category such as outage, dns, ssl, or workers." },
+    priority: { type: "string", description: "P1, P2, P3, or P4." },
+    service: { type: "string", description: "Affected Cloudflare product." },
+    startedUtc: { type: "string", description: "Start time as YYYY-MM-DDTHH:mm." },
+    zoneName: { type: "string", description: "Zone name, such as example.com." },
+    zoneId: { type: "string", description: "32-character zone ID." },
+    hostnames: { type: "string", description: "Affected hostnames." },
+    frequency: { type: "string", description: "How often the problem happens." },
+    affectedUsers: { type: "string", description: "Who is affected." },
+    impact: { type: "string", description: "Production and business impact." },
+    expected: { type: "string", description: "Expected behavior." },
+    actual: { type: "string", description: "Actual behavior." },
+    reproduction: { type: "string", description: "Steps to reproduce." },
+    exampleUrls: { type: "string", description: "Example URLs without sensitive query parameters." },
+    exactErrors: { type: "string", description: "Exact error text." },
+    rayIds: { type: "string", description: "Cloudflare Ray IDs." },
+    recentChanges: { type: "string", description: "Recent configuration or origin changes." },
+    originFindings: { type: "string", description: "Origin findings with UTC timestamps, not secrets." },
+    attachments: { type: "string", description: "Prepared attachment filenames." },
+    participants: { type: "string", description: "People to copy on the case." },
+  },
+};
+
+function applyCaseFields(input) {
+  if (!input || typeof input !== "object") return;
+  for (const [name, value] of Object.entries(input)) {
+    const control = elements.form.elements[name];
+    if (!control || value == null) continue;
+    control.value = String(value);
+  }
+  updateCriticalState();
+  scheduleSave();
+  updateProgress();
+}
+
+function registerWebMcpTools() {
+  const modelContext = document.modelContext ?? navigator.modelContext;
+  if (!modelContext || typeof modelContext.registerTool !== "function") return;
+
+  const controller = new AbortController();
+  window.addEventListener("pagehide", () => controller.abort(), { once: true });
+  const options = { signal: controller.signal };
+  const tools = [
+    {
+      name: "analyze_cloudflare_issue",
+      description:
+        "Analyze a Cloudflare error description on this page and show the likely issue, next checks, and evidence. Do not include secrets.",
+      inputSchema: {
+        type: "object",
+        additionalProperties: false,
+        properties: {
+          message: {
+            type: "string",
+            description: "Error text, affected URL, Ray ID, and UTC timestamp.",
+          },
+        },
+        required: ["message"],
+      },
+      async execute(input) {
+        elements.message.value = String(input?.message ?? "");
+        scheduleSave();
+        return analyzeIssue();
+      },
+    },
+    {
+      name: "get_case_evidence",
+      description: "Show the Cloudflare and origin evidence checklist for an issue category.",
+      inputSchema: {
+        type: "object",
+        additionalProperties: false,
+        properties: {
+          issueType: {
+            type: "string",
+            description: "outage, performance, dns, ssl, security, workers, zero-trust, or other.",
+          },
+        },
+      },
+      async execute(input) {
+        applyCaseFields({ issueType: input?.issueType || "other" });
+        return updateEvidence();
+      },
+    },
+    {
+      name: "generate_support_case_draft",
+      description:
+        "Write the incident fields into the case form and generate a copy-ready Cloudflare Support draft. Never include API tokens or other secrets.",
+      inputSchema: caseFieldSchema,
+      async execute(input) {
+        applyCaseFields(input);
+        return generateDraft();
+      },
+    },
+  ];
+
+  for (const tool of tools) {
+    Promise.resolve(modelContext.registerTool(tool, options)).catch((error) => {
+      console.error("WebMCP tool registration failed", error);
+    });
+  }
+}
+
+try {
+  registerWebMcpTools();
+} catch (error) {
+  console.error("WebMCP setup failed", error);
 }

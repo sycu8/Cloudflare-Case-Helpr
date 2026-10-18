@@ -173,8 +173,16 @@ The deployment exposes:
 - `/api/evidence` — adaptive evidence requirements;
 - `/api/case/*` — validation and draft generation;
 - `/api/cloudflare/*` — in-memory customer account connection;
-- `/health` — health check with no customer data; and
-- `/` — responsive customer application.
+- `/health` — health check with no customer data;
+- `/` — responsive customer application;
+- `/robots.txt` and `/sitemap.xml` — crawl rules, Content Signals, and canonical URLs;
+- `/auth.md` — how an agent obtains a Cloudflare API token;
+- `/.well-known/api-catalog`, `openapi.json`, `mcp/server-card.json`, `agent-skills/index.json`, and `ai-catalog.json` — machine-readable discovery; and
+- `/.well-known/oauth-protected-resource` and `oauth-authorization-server` — metadata for the token header. This origin does not mint OAuth tokens.
+
+Search crawlers and user-triggered fetchers may read public pages. Training crawlers are disallowed. `/api/` and `/mcp` are disallowed for every crawler.
+
+DNS for AI Discovery (DNS-AID) records are not created by the Worker. On a custom domain, publish the HTTPS and TXT records in `dns/dnsaid.zone` and enable DNSSEC. A `*.workers.dev` hostname cannot hold `_agents` records.
 
 Before offering the application as a public shared service, add Cloudflare
 Turnstile and rate limiting to the screenshot-analysis endpoint, and protect

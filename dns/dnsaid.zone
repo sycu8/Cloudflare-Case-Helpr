@@ -1,0 +1,21 @@
+; DNS for AI Discovery (DNS-AID) records for the Support Case Helper.
+;
+; The Worker cannot publish these. Add them on a custom domain you control,
+; then enable DNSSEC on that zone so validating resolvers return authenticated
+; data. A *.workers.dev hostname cannot host _agents records.
+;
+; Replace example.com with the hostname that serves this Worker. The HTTPS
+; target "." means the same name. alpn and port are required ServiceMode
+; parameters. The TXT records carry the HTTP paths DNS-AID does not encode
+; in a registered SvcParam yet.
+
+$ORIGIN example.com.
+$TTL 3600
+
+_index._agents     3600 IN HTTPS 1 . alpn="h2,http/1.1" port=443 mandatory=alpn,port
+_index._agents     3600 IN TXT   "url=https://example.com/.well-known/ai-catalog.json"
+
+_mcp._agents       3600 IN HTTPS 1 . alpn="h2,http/1.1" port=443 mandatory=alpn,port
+_mcp._agents       3600 IN TXT   "path=/mcp"
+
+_catalog._agents   3600 IN TXT   "url=https://example.com/.well-known/ai-catalog.json"
