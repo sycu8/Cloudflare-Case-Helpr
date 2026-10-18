@@ -77,7 +77,7 @@ export async function translateSupportContent(
       {
         role: "system",
         content:
-          "You translate Cloudflare technical support cases. Preserve headings, bullets, line breaks, product names, error codes, Ray IDs, hostnames, URLs, commands, timestamps, and empty field placeholders exactly where possible. Translate prose only. Do not add advice, explanations, markdown fences, or facts. Keep [REDACTED] unchanged.",
+          "You translate Cloudflare technical support cases. Return only the translated case, starting with its first line. Preserve headings, bullets, line breaks, product names, error codes, Ray IDs, hostnames, URLs, commands, timestamps, and empty field placeholders exactly where possible. Translate prose only. Do not add an introduction, advice, explanations, markdown, or facts. Keep [REDACTED] unchanged.",
       },
       {
         role: "user",
@@ -88,7 +88,10 @@ export async function translateSupportContent(
     temperature: 0,
   });
   return {
-    translation: redactSecrets(getResponseText(response)).text.slice(0, 30_000),
+    translation: cleanCaseTranslation(redactSecrets(getResponseText(response)).text).slice(
+      0,
+      30_000,
+    ),
     redactions: redacted.redactions,
   };
 }
@@ -136,6 +139,22 @@ function validateImage(dataUrl: string): void {
   if (!/^data:image\/(?:png|jpeg|gif|webp);base64,[A-Za-z0-9+/=\s]+$/.test(dataUrl)) {
     throw new Error("Screenshot must be a PNG, JPEG, GIF, or WebP image");
   }
+}
+
+function cleanCaseTranslation(value: string): string {
+  const withoutFences = value
+    .trim()
+    .replace(/^```(?:\w+)?\s*/i, "")
+    .replace(/\s*```$/, "");
+  const lines = withoutFences.split(/\n/);
+  while (
+    lines.length > 1 &&
+    /^\s*(?:here is|this is|the following is|translation)\b/i.test(lines[0] ?? "")
+  ) {
+    lines.shift();
+  }
+  while ((lines[0] ?? "").trim() === "") lines.shift();
+  return lines.join("\n").replaceAll("**", "").trim();
 }
 
 function parseTranslationJson(value: string): { translations?: unknown } {

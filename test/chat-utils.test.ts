@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 // @ts-expect-error Browser utility is intentionally shipped as plain JavaScript.
-import { isDuplicateComposerSubmission, parseHumanUtc } from "../public/chat-utils.js";
+import { displayedDraft, draftStatusMessage, draftTranslationRequest, isDuplicateComposerSubmission, normalizeDraftLanguage, parseHumanUtc } from "../public/chat-utils.js";
 
 const referenceDate = new Date("2026-07-15T06:45:00Z");
 
@@ -27,6 +27,47 @@ describe("composer duplicate protection", () => {
     expect(
       isDuplicateComposerSubmission("today at 3pm", "pm", 120),
     ).toBe(true);
+  });
+
+  it("shows English, Vietnamese, and Khmer drafts from the menu language", () => {
+    const english = "Title: P3 CDN – Error 522\n- Ray ID: 49ddb3e70e665831";
+
+    expect(normalizeDraftLanguage("en")).toBe("en");
+    expect(normalizeDraftLanguage("vi")).toBe("vi");
+    expect(normalizeDraftLanguage("km")).toBe("km");
+    expect(normalizeDraftLanguage("fr")).toBe("en");
+
+    expect(draftTranslationRequest(english, "en")).toBeNull();
+    expect(draftTranslationRequest("  ", "vi")).toBeNull();
+    expect(draftTranslationRequest(english, "vi")).toEqual({
+      path: "/api/translate",
+      body: { text: english, targetLanguage: "vi" },
+    });
+    expect(draftTranslationRequest(english, "km").body.targetLanguage).toBe("km");
+
+    expect(displayedDraft(english, "en", "ignored")).toEqual({
+      text: english,
+      language: "en",
+      fellBack: false,
+    });
+    expect(displayedDraft(english, "vi", "Tiêu đề: P3 CDN")).toEqual({
+      text: "Tiêu đề: P3 CDN",
+      language: "vi",
+      fellBack: false,
+    });
+    expect(displayedDraft(english, "km", "   ")).toEqual({
+      text: english,
+      language: "en",
+      fellBack: true,
+    });
+    expect(displayedDraft(english, "vi", undefined)).toMatchObject({
+      text: english,
+      fellBack: true,
+    });
+    expect(draftStatusMessage("km", false)).toBe("Draft shown in ខ្មែរ.");
+    expect(draftStatusMessage("vi", true)).toBe(
+      "Translation failed. Showing the English draft.",
+    );
   });
 
   it("allows unrelated answers and delayed text", () => {

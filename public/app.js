@@ -1,5 +1,9 @@
 import {
+  displayedDraft,
+  draftStatusMessage,
+  draftTranslationRequest,
   isDuplicateComposerSubmission,
+  normalizeDraftLanguage,
   parseHumanUtc,
 } from "./chat-utils.js";
 
@@ -210,6 +214,10 @@ let saveTimer;
 let isSubmitting = false;
 let lastSubmittedText = "";
 let lastSubmittedAt = 0;
+let uiLanguage = "en";
+let draftRequestId = 0;
+let displayedDraftPromise = Promise.resolve("");
+const draftTranslationCache = new Map();
 
 initializeConversation();
 
@@ -686,7 +694,7 @@ function completeCase() {
   addMessage(
     "assistant",
     "The minimum information is complete. I generated a Support case draft in the case panel.",
-    "Review every technical value, attach the listed evidence, and remove any secrets before submission. Cloudflare Support officially handles cases in English.",
+    "Review every technical value and remove any secrets before submission. The draft follows the language menu. English is used if translation fails.",
   );
   saveState();
   renderAll();
@@ -899,12 +907,66 @@ function renderEvidence() {
 }
 
 function renderDraft() {
+  displayedDraftPromise = refreshDisplayedDraft();
+}
+
+function refreshDisplayedDraft() {
   if (!state.draft) {
+    draftRequestId += 1;
     elements.draftPanel.hidden = true;
-    return;
+    elements.draftOutput.value = "";
+    return Promise.resolve("");
   }
-  elements.draftOutput.value = state.draft;
+
+  const englishDraft = state.draft;
+  const language = normalizeDraftLanguage(uiLanguage);
+  const requestId = ++draftRequestId;
   elements.draftPanel.hidden = false;
+  const request = draftTranslationRequest(englishDraft, language);
+  if (!request) {
+    showDraft(englishDraft, "en", false);
+    return Promise.resolve(englishDraft);
+  }
+
+  const cacheKey = `${language}:${hashStrings([englishDraft])}`;
+  const cached = draftTranslationCache.get(cacheKey);
+  if (cached) {
+    showDraft(cached, language, false);
+    return Promise.resolve(cached);
+  }
+
+  elements.draftOutput.value = englishDraft;
+  elements.draftStatus.textContent = "Translating the case draft…";
+  return api(request.path, {
+    method: "POST",
+    body: JSON.stringify(request.body),
+  })
+    .then((result) => {
+      if (requestId !== draftRequestId || state.draft !== englishDraft) {
+        return elements.draftOutput.value;
+      }
+      const displayed = displayedDraft(
+        englishDraft,
+        language,
+        result?.translation,
+      );
+      if (!displayed.fellBack) draftTranslationCache.set(cacheKey, displayed.text);
+      showDraft(displayed.text, displayed.language, displayed.fellBack);
+      return displayed.text;
+    })
+    .catch(() => {
+      if (requestId !== draftRequestId || state.draft !== englishDraft) {
+        return elements.draftOutput.value;
+      }
+      showDraft(englishDraft, "en", true);
+      return englishDraft;
+    });
+}
+
+function showDraft(text, language, fellBack) {
+  elements.draftOutput.value = text;
+  elements.draftPanel.hidden = false;
+  elements.draftStatus.textContent = draftStatusMessage(language, fellBack);
 }
 
 function saveState() {
@@ -1049,6 +1111,7 @@ async function setUiLanguage(language) {
     }
     applyUiTranslations(translations);
     document.documentElement.lang = language;
+    uiLanguage = language;
     localStorage.setItem(UI_LANGUAGE_KEY, language);
     elements.currentLanguage.textContent = names[language];
     for (const button of elements.uiLanguageButtons) {
@@ -1057,8 +1120,9 @@ async function setUiLanguage(language) {
         button.dataset.uiLanguage === language,
       );
     }
+    await refreshDisplayedDraft();
   } catch (error) {
-    elements.currentLanguage.textContent = names.en;
+    elements.currentLanguage.textContent = names[uiLanguage] ?? names.en;
     setStatus(`Interface translation unavailable: ${error.message}`, true);
   } finally {
     setUiLanguageBusy(false);
@@ -1283,7 +1347,7 @@ function registerWebMcpTools() {
     {
       name: "generate_support_case_draft",
       description:
-        "Write the incident fields into the local case and generate a copy-ready English Cloudflare Support draft. Never include API tokens or other secrets.",
+        "Write the incident fields into the local case and generate a copy-ready Cloudflare Support draft in the selected page language. English is used if translation fails. Never include API tokens or other secrets.",
       inputSchema: caseFieldSchema,
       async execute(input) {
         applyCaseFields(input);
@@ -1298,8 +1362,11 @@ function registerWebMcpTools() {
           saveState();
           renderAll();
         }
+        await displayedDraftPromise;
         return {
-          draft: state.draft || generateCaseDraft(state.caseData),
+          draft: elements.draftOutput.value || state.draft,
+          englishDraft: state.draft,
+          language: normalizeDraftLanguage(uiLanguage),
           caseData: { ...state.caseData },
         };
       },

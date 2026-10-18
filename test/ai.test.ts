@@ -81,6 +81,24 @@ describe("screenshot analysis", () => {
     });
   });
 
+  it("drops a model preamble from a translated case", async () => {
+    const run = vi.fn().mockResolvedValue({
+      response:
+        "Here is the translation of the support case into Vietnamese:\n\n**Tiêu đề:** Lỗi 522\nRay ID: 49ddb3e70e665831",
+    });
+
+    const result = await translateSupportContent(
+      { run },
+      "Title: Error 522\nRay ID: 49ddb3e70e665831",
+      "vi",
+    );
+
+    expect(result.translation.startsWith("Tiêu đề:")).toBe(true);
+    expect(result.translation).toContain("49ddb3e70e665831");
+    expect(result.translation).not.toContain("Here is the translation");
+    expect(result.translation).not.toContain("**");
+  });
+
   it("returns ordered UI translations for browser caching", async () => {
     const run = vi.fn().mockResolvedValue({
       response: JSON.stringify({
