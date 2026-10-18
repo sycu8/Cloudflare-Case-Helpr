@@ -2,9 +2,11 @@ import { z } from "zod";
 
 import {
   analyzeIssueWithOptionalImage,
+  translateSupportContent,
   translateUiContent,
 } from "./ai";
 import { CloudflareApiError, CloudflareClient } from "./cloudflare";
+import { protectedResourceChallenge } from "./discovery";
 import {
   generateCaseDraft,
   getRequiredEvidence,
@@ -84,6 +86,22 @@ export async function handleApi(
       });
     }
 
+    if (url.pathname === "/api/translate" && request.method === "POST") {
+      const body = z
+        .object({
+          text: z.string().min(1).max(20_000),
+          targetLanguage: z.enum(["en", "vi", "km"]),
+        })
+        .parse(await readJson(request));
+      return Response.json(
+        await translateSupportContent(
+          env.AI,
+          body.text,
+          body.targetLanguage,
+        ),
+      );
+    }
+
     if (url.pathname === "/api/translate-ui" && request.method === "POST") {
       const body = z
         .object({
@@ -151,7 +169,9 @@ export async function handleApi(
       );
     }
     if (error instanceof CloudflareApiError) {
-      return Response.json(
+      const status =
+        error.status >= 400 && error.status < 600 ? error.status : 502;
+      const response = Response.json(
         {
           error: "cloudflare_api_error",
           message: error.message,
@@ -161,8 +181,15 @@ export async function handleApi(
               ? "Use an active, least-privilege token scoped to the selected account and zone."
               : undefined,
         },
-        { status: error.status >= 400 && error.status < 600 ? error.status : 502 },
+        { status },
       );
+      if (status === 401) {
+        response.headers.set(
+          "WWW-Authenticate",
+          protectedResourceChallenge(url.origin),
+        );
+      }
+      return response;
     }
     return jsonError(
       error instanceof Error ? error.message : "Unexpected request failure",

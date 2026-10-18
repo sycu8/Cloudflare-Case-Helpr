@@ -171,6 +171,12 @@ const fieldLabels = {
   exactErrors: "Error",
   rayIds: "Ray ID",
   originFindings: "Origin",
+  zoneName: "Zone",
+  zoneId: "Zone ID",
+  exampleUrls: "Example URL",
+  recentChanges: "Changes",
+  attachments: "Attachments",
+  participants: "Participants",
 };
 
 const evidenceByIssue = {
@@ -379,11 +385,13 @@ async function handleInitialIssue(text) {
     } else {
       beginQuestions();
     }
+    return analysis;
   } catch (error) {
     addMessage(
       "assistant",
       `I could not analyze that input: ${error.message}\n\nYou can continue by describing the exact error in text.`,
     );
+    return { error: error.message };
   } finally {
     removeScreenshot();
     setBusy(false);
@@ -695,8 +703,9 @@ function generateCaseDraft(data) {
   return `Title: ${title}
 
 Account / zone
-- Zone name or affected hostname: ${safe.hostnames || ""}
+- Zone name: ${safe.zoneName || ""}
 - Zone ID: ${safe.zoneId || ""}
+- Affected hostname: ${safe.hostnames || ""}
 
 Impact
 - Priority: ${safe.priority || ""}
@@ -710,16 +719,19 @@ Issue
 - Actual behavior: ${safe.actual || ""}
 - Exact error(s): ${safe.exactErrors || ""}
 - Steps to reproduce: ${safe.reproduction || ""}
+- Example URL(s): ${safe.exampleUrls || ""}
 
 Investigation
 - Cloudflare Ray ID(s): ${safe.rayIds || ""}
+- Recent changes: ${safe.recentChanges || ""}
 - Origin/log findings: ${safe.originFindings || "Not yet provided"}
 
 Evidence to attach
 ${state.evidence.map((item) => `- ${item}`).join("\n")}
+- Prepared files: ${safe.attachments || "None listed"}
 
 Case participants
-- CC: `;
+- CC: ${safe.participants || ""}`;
 }
 
 function redactLocalSecrets(value) {
@@ -1150,3 +1162,159 @@ function hashStrings(values) {
 }
 
 initializeLanguageMenu();
+
+const caseFieldSchema = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    issueType: { type: "string", description: "Issue category such as outage, dns, ssl, or workers." },
+    priority: { type: "string", description: "P1, P2, P3, or P4." },
+    service: { type: "string", description: "Affected Cloudflare product." },
+    startedUtc: { type: "string", description: "Start time as YYYY-MM-DDTHH:mm." },
+    zoneName: { type: "string", description: "Zone name, such as example.com." },
+    zoneId: { type: "string", description: "32-character zone ID." },
+    hostnames: { type: "string", description: "Affected hostnames." },
+    frequency: { type: "string", description: "How often the problem happens." },
+    affectedUsers: { type: "string", description: "Who is affected." },
+    impact: { type: "string", description: "Production and business impact." },
+    expected: { type: "string", description: "Expected behavior." },
+    actual: { type: "string", description: "Actual behavior." },
+    reproduction: { type: "string", description: "Steps to reproduce." },
+    exampleUrls: { type: "string", description: "Example URLs without sensitive query parameters." },
+    exactErrors: { type: "string", description: "Exact error text." },
+    rayIds: { type: "string", description: "Cloudflare Ray IDs." },
+    recentChanges: { type: "string", description: "Recent configuration or origin changes." },
+    originFindings: { type: "string", description: "Origin findings with UTC timestamps, not secrets." },
+    attachments: { type: "string", description: "Prepared attachment filenames." },
+    participants: { type: "string", description: "People to copy on the case." },
+  },
+};
+
+function applyCaseFields(input) {
+  if (!input || typeof input !== "object") return;
+  for (const [name, value] of Object.entries(input)) {
+    if (!Object.hasOwn(caseFieldSchema.properties, name) || value == null || value === "") {
+      continue;
+    }
+    state.caseData[name] = String(value);
+  }
+}
+
+async function analyzeIssueForAgent(message) {
+  if (state.phase === "initial") return handleInitialIssue(message);
+  const analysis = analyzeLocally(message);
+  if (analysis.requiredEvidence?.length) state.evidence = analysis.requiredEvidence;
+  inferCaseData(message, analysis);
+  addMessage("user", message || "Attached an error description.");
+  addMessage(
+    "assistant",
+    `Likely issue: ${analysis.likelyIssue}\nConfidence: ${analysis.confidence}\n\n${analysis.explanation}`,
+    `Next checks:\n${(analysis.nextChecks ?? []).map((item, index) => `${index + 1}. ${item}`).join("\n")}`,
+    "diagnosis",
+  );
+  saveState();
+  renderAll();
+  return analysis;
+}
+
+function registerWebMcpTools() {
+  const modelContext = document.modelContext ?? navigator.modelContext;
+  if (!modelContext || typeof modelContext.registerTool !== "function") return;
+
+  const controller = new AbortController();
+  window.addEventListener("pagehide", () => controller.abort(), { once: true });
+  const options = { signal: controller.signal };
+  const tools = [
+    {
+      name: "analyze_cloudflare_issue",
+      description:
+        "Analyze a Cloudflare error description on this page and show the likely issue, next checks, and evidence. Do not include secrets.",
+      inputSchema: {
+        type: "object",
+        additionalProperties: false,
+        properties: {
+          message: {
+            type: "string",
+            description: "Error text, affected URL, Ray ID, and UTC timestamp.",
+          },
+        },
+        required: ["message"],
+      },
+      async execute(input) {
+        const message = String(input?.message ?? "").trim();
+        if (!message && !screenshotDataUrl) {
+          return { error: "Describe the issue or add a screenshot." };
+        }
+        return analyzeIssueForAgent(message);
+      },
+    },
+    {
+      name: "get_case_evidence",
+      description: "Show the Cloudflare and origin evidence checklist for an issue category.",
+      inputSchema: {
+        type: "object",
+        additionalProperties: false,
+        properties: {
+          issueType: {
+            type: "string",
+            description: "outage, performance, dns, ssl, security, workers, zero-trust, or other.",
+          },
+        },
+      },
+      async execute(input) {
+        const issueType = String(input?.issueType || state.caseData.issueType || "other");
+        state.caseData.issueType = issueType;
+        try {
+          const result = await api(
+            `/api/evidence?issue_type=${encodeURIComponent(issueType)}`,
+          );
+          state.evidence = result.evidence ?? [];
+          saveState();
+          renderAll();
+          return result;
+        } catch (error) {
+          state.evidence = evidenceByIssue[issueType] ?? evidenceByIssue.other;
+          saveState();
+          renderAll();
+          return { issueType, evidence: state.evidence, error: error.message };
+        }
+      },
+    },
+    {
+      name: "generate_support_case_draft",
+      description:
+        "Write the incident fields into the local case and generate a copy-ready English Cloudflare Support draft. Never include API tokens or other secrets.",
+      inputSchema: caseFieldSchema,
+      async execute(input) {
+        applyCaseFields(input);
+        if (!findNextQuestion()) {
+          completeCase();
+        } else if (!state.currentQuestion) {
+          if (state.phase === "initial") state.phase = "questions";
+          state.draft = generateCaseDraft(state.caseData);
+          askNextQuestion();
+        } else {
+          state.draft = generateCaseDraft(state.caseData);
+          saveState();
+          renderAll();
+        }
+        return {
+          draft: state.draft || generateCaseDraft(state.caseData),
+          caseData: { ...state.caseData },
+        };
+      },
+    },
+  ];
+
+  for (const tool of tools) {
+    Promise.resolve(modelContext.registerTool(tool, options)).catch((error) => {
+      console.error("WebMCP tool registration failed", error);
+    });
+  }
+}
+
+try {
+  registerWebMcpTools();
+} catch (error) {
+  console.error("WebMCP setup failed", error);
+}

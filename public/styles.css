@@ -178,13 +178,16 @@ a {
   top: calc(100% + 8px);
   right: 0;
   z-index: 30;
-  display: grid;
   min-width: 150px;
   padding: 6px;
   background: #fff;
   border: 1px solid var(--line);
   border-radius: 10px;
   box-shadow: var(--shadow);
+}
+
+.language-menu-popover:not([hidden]) {
+  display: grid;
 }
 
 .language-menu-popover button {
@@ -194,6 +197,7 @@ a {
   background: transparent;
   border: 0;
   border-radius: 7px;
+  font-size: 0.82rem;
 }
 
 .language-menu-popover button:hover,

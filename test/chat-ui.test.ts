@@ -43,6 +43,16 @@ describe("local chatbot UI", () => {
     expect(script).toContain('["service", "Impacted service(s)"]');
   });
 
+  it("keeps agent discovery links and page actions", () => {
+    expect(html).toContain('rel="api-catalog"');
+    expect(html).toContain('href="/.well-known/openapi.json"');
+    expect(html).toContain('href="/auth.md"');
+    expect(script).toContain("function registerWebMcpTools()");
+    expect(script).toContain('name: "analyze_cloudflare_issue"');
+    expect(script).toContain('name: "get_case_evidence"');
+    expect(script).toContain('name: "generate_support_case_draft"');
+  });
+
   it("accepts screenshots pasted from the clipboard", () => {
     expect(script).toContain('elements.composer.addEventListener("paste"');
     expect(script).toContain("event.clipboardData?.items");

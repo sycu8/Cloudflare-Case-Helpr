@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import {
   analyzeIssueWithOptionalImage,
+  translateSupportContent,
   translateUiContent,
 } from "../src/ai";
 
@@ -53,11 +54,38 @@ describe("screenshot analysis", () => {
     expect(run).not.toHaveBeenCalled();
   });
 
+  it("translates support content while requesting technical-value preservation", async () => {
+    const run = vi.fn().mockResolvedValue({
+      response:
+        "Lỗi thực tế: Cloudflare Error 522\nRay ID: 49ddb3e70e665831",
+    });
+
+    const result = await translateSupportContent(
+      { run },
+      "Actual result: Cloudflare Error 522\nRay ID: 49ddb3e70e665831",
+      "vi",
+    );
+
+    expect(result.translation).toContain("Cloudflare Error 522");
+    expect(result.translation).toContain("49ddb3e70e665831");
+    expect(run.mock.calls[0]?.[1]).toMatchObject({
+      messages: [
+        expect.objectContaining({
+          content: expect.stringContaining("Preserve headings"),
+        }),
+        expect.objectContaining({
+          content: expect.stringContaining("Vietnamese"),
+        }),
+      ],
+      temperature: 0,
+    });
+  });
+
   it("returns ordered UI translations for browser caching", async () => {
     const run = vi.fn().mockResolvedValue({
-      response: {
+      response: JSON.stringify({
         translations: ["Phân tích sự cố", "Tạo bản nháp"],
-      },
+      }),
     });
 
     const result = await translateUiContent(
@@ -71,6 +99,22 @@ describe("screenshot analysis", () => {
       response_format: { type: "json_object" },
       temperature: 0,
     });
+  });
+
+  it("accepts structured Workers AI translation objects", async () => {
+    const run = vi.fn().mockResolvedValue({
+      response: {
+        translations: ["Phân tích sự cố", "Tạo bản nháp"],
+      },
+    });
+
+    const result = await translateUiContent(
+      { run },
+      ["Analyze issue", "Generate draft"],
+      "vi",
+    );
+
+    expect(result).toEqual(["Phân tích sự cố", "Tạo bản nháp"]);
   });
 
   it("rejects incomplete UI translation responses", async () => {

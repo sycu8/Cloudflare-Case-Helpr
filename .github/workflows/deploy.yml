@@ -4,7 +4,7 @@ on:
   push:
     branches:
       - main
-      - cursor/cloudflare-troubleshooting-mcp-1741
+      - cursor/agent-discovery-610c
   workflow_dispatch:
 
 concurrency:

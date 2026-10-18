@@ -10,7 +10,7 @@
   "assets": {
     "binding": "ASSETS",
     "directory": "./public",
-    "run_worker_first": ["/api/*", "/mcp", "/health"]
+    "run_worker_first": ["/api/*", "/mcp", "/health", "/", "/index.html"]
   },
   "observability": {
     "enabled": true,

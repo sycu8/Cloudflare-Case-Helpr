@@ -3,6 +3,13 @@ import { createMcpHandler } from "agents/mcp";
 import { z } from "zod";
 
 import { handleApi } from "./api";
+import {
+  SERVER_NAME,
+  SERVER_VERSION,
+  handleDiscovery,
+  protectedResourceChallenge,
+  withHomepageLinks,
+} from "./discovery";
 import { CloudflareApiError, CloudflareClient } from "./cloudflare";
 import {
   normalizeRayId,
@@ -60,8 +67,8 @@ const supportCaseInputSchema = {
 
 export function createServer(client: CloudflareClient): McpServer {
   const server = new McpServer({
-    name: "Cloudflare Troubleshooting",
-    version: "0.1.0",
+    name: SERVER_NAME,
+    version: SERVER_VERSION,
   });
 
   server.registerTool(
@@ -411,6 +418,9 @@ export default {
       return new Response(null, { status: 204, headers: corsHeaders() });
     }
 
+    const discovery = await handleDiscovery(request);
+    if (discovery) return discovery;
+
     if (url.pathname === "/health") {
       return Response.json({
         status: "ok",
@@ -422,20 +432,27 @@ export default {
       return handleApi(request, env);
     }
 
+    if (url.pathname === "/" || url.pathname === "/index.html") {
+      return withHomepageLinks(await env.ASSETS.fetch(request));
+    }
+
     if (url.pathname !== "/mcp") return env.ASSETS.fetch(request);
 
     const token = request.headers.get(TOKEN_HEADER)?.trim();
     if (!token) {
-      return withCors(
-        Response.json(
-          {
-            error: "missing_cloudflare_api_token",
-            message:
-              `Set ${TOKEN_HEADER} in the MCP transport headers. Do not send the token as a tool argument.`,
-          },
-          { status: 401 },
-        ),
+      const unauthorized = Response.json(
+        {
+          error: "missing_cloudflare_api_token",
+          message:
+            `Set ${TOKEN_HEADER} in the MCP transport headers. Do not send the token as a tool argument. See ${url.origin}/auth.md.`,
+        },
+        { status: 401 },
       );
+      unauthorized.headers.set(
+        "WWW-Authenticate",
+        protectedResourceChallenge(url.origin),
+      );
+      return withCors(unauthorized);
     }
 
     try {
