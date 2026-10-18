@@ -154,11 +154,14 @@ function getResponseText(value: unknown): string {
   if (
     typeof value === "object" &&
     value !== null &&
-    "response" in value &&
-    typeof value.response === "string"
+    "response" in value
   ) {
-    return value.response;
+    if (typeof value.response === "string") return value.response;
+    if (typeof value.response === "object" && value.response !== null) {
+      return JSON.stringify(value.response);
+    }
   }
   if (typeof value === "string") return value;
-  throw new Error("The screenshot model returned an unsupported response");
+  if (typeof value === "object" && value !== null) return JSON.stringify(value);
+  throw new Error("Workers AI returned an unsupported response");
 }

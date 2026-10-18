@@ -6,18 +6,23 @@ on Cloudflare Workers with Static Assets, Workers AI, and Streamable HTTP MCP.
 
 The browser application can:
 
-- analyze error descriptions and screenshots;
+- analyze error descriptions locally and screenshots uploaded or pasted
+  directly into the chat with Workers AI;
 - identify common Cloudflare errors, Ray IDs, hostnames, and UTC timestamps;
-- guide customers through Cloudflare and origin evidence collection;
-- connect to a customer account using an in-memory, read-only API token;
-- validate case completeness and attachment formats;
+- conduct a local adaptive chat that asks only for missing minimum case fields;
+- request custom impacted service names when the customer selects **Other**;
+- show Cloudflare and origin evidence-collection guidance with each question;
+- accept conversational incident times and normalize them to UTC for log
+  correlation;
+- increase requirements automatically for P1 critical incidents;
 - warn about possible secrets and unsupported P1 priority;
-- save drafts locally on the customer's device; and
-- generate a concise case ready to copy into Cloudflare Support;
-- translate generated drafts into English, Vietnamese, or Khmer while
-  preserving technical identifiers; and
+- store chat, answers, and drafts only in the customer's browser;
+- generate the copy-ready Support case locally in English without sending
+  answers to the server;
 - switch the full website interface from the persistent language menu, with
-  translated UI content cached locally by language and content version.
+  translated UI content cached locally by language and content version; and
+- provide an Open Graph and large Twitter/X preview image when the public link
+  is shared.
 
 The MCP server can:
 
@@ -44,6 +49,7 @@ chat message or pass it as a tool argument.
 The Worker:
 
 - keeps no customer token, screenshot, draft, or log data in server-side storage;
+- does not receive normal chat answers or locally generated case drafts;
 - never returns the token in a tool response;
 - sends the token only to `api.cloudflare.com`;
 - sends screenshots only to the configured Workers AI binding for the requested

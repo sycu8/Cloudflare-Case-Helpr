@@ -101,6 +101,22 @@ describe("screenshot analysis", () => {
     });
   });
 
+  it("accepts structured Workers AI translation objects", async () => {
+    const run = vi.fn().mockResolvedValue({
+      response: {
+        translations: ["Phân tích sự cố", "Tạo bản nháp"],
+      },
+    });
+
+    const result = await translateUiContent(
+      { run },
+      ["Analyze issue", "Generate draft"],
+      "vi",
+    );
+
+    expect(result).toEqual(["Phân tích sự cố", "Tạo bản nháp"]);
+  });
+
   it("rejects incomplete UI translation responses", async () => {
     const run = vi.fn().mockResolvedValue({
       response: JSON.stringify({ translations: ["តែមួយ"] }),
